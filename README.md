@@ -37,22 +37,25 @@ python src/build_cvelist_dataset.py path/to/2026-09-25_all_CVEs_at_midnight.zip.
 
 ## Reproducing the numbers in the paper (CPU)
 
-Each command rewrites a result file under `results/`. With the included predictions, all of them reproduce the published files byte for byte (we checked this on 29 September 2026). Tables and figures are numbered as in the submitted manuscript; tables S1–S3 are in its supplementary material.
+Each command rewrites a result file under `results/`. Commands marked ✓ were re-run on 29 September 2026 with the included predictions and reproduced the numbers reported in the paper; the others use fixed random seeds but have not yet been re-run for this check. Tables and figures are numbered as in the submitted manuscript; tables S1–S9 and Note S1 are in its supplementary material.
 
-| Command | Paper | Time |
-|---|---|---|
-| `python src/label_provenance.py` | Section 4, Table 3, Table S1 | seconds |
-| `python src/pairing_provenance.py` | Section 7.2, Table S2 | seconds |
-| `python src/sensitivity_analyses.py` | Sections 4.3, 7.1 and 8.2 | 1 min |
-| `python src/main_table.py` | Table 7 | 5 min |
-| `python src/aggregate_seeds.py --config_none e5_cwinv_sqrt --config_aux e5_cwinv_sqrt --lam 0.5` | Section 7.3 (paired bootstrap) | 6 min |
-| `python src/cwe_control.py` | Section 7.3 (CWE control) | 6 min |
-| `python src/label_efficiency.py` | Section 7.4, Figure 3, Table S3 | 10 min |
-| `python src/summarize_risk_decode.py` | Section 7.5, Table 8 | seconds |
-| `python src/llm_bootstrap.py` | Section 7.1, Table 6 and its intervals | 1 min |
-| `python src/llm_repeat_variance.py` | Section 7.6 (stability) | seconds |
-| `python src/baselines_v0.py` | Classical baselines (retrains TF-IDF + LR) | 15 min |
-| `python src/fig1_rule_agreement.py`, `python src/fig2_protocol.py` | Figures 1 and 2 | seconds |
+| Command | Paper | Time | Re-run |
+|---|---|---|---|
+| `python src/label_provenance.py` | Section 4, Table 2, Table S1 | seconds | ✓ |
+| `python src/pairing_provenance.py` | Section 7.2, Table S2 | seconds | ✓ |
+| `python src/sensitivity_analyses.py` | Sections 4.3, 7.1 and 8.2 | 1 min | ✓ |
+| `python src/main_table.py` | Table 5 | 5 min | ✓ |
+| `python src/aggregate_seeds.py --config_none e5_cwinv_sqrt --config_aux e5_cwinv_sqrt --lam 0.5` | Section 7.3 (paired bootstrap) | 6 min | ✓ |
+| `python src/cwe_control.py` | Section 7.3 (CWE control) | 6 min |  |
+| `python src/label_efficiency.py` | Section 7.4, Figure 3, Table S3 | 10 min | ✓ |
+| `python src/summarize_risk_decode.py` | Section 7.5, Table 6 | seconds | ✓ |
+| `python src/llm_bootstrap.py` | Section 7.1, Table 4 and its intervals | 1 min | ✓ |
+| `python src/llm_repeat_variance.py` | Section 7.6 (stability) | seconds | ✓ |
+| `python src/baselines_v0.py` | Classical baselines (retrains TF-IDF + LR), Table S9 | 15 min | ✓ |
+| `python src/review_checks.py` | Robustness checks: fallback of the dependence test, clean subset, LLM post-processing, monotonicity of CVSS-B, sources of the v3.1 pool (Sections 4.2–7.1, Table S4) | 2 min |  |
+| `python src/review_checks2.py` | Training randomness, test-set weighting, per-metric inflation, near-duplicates, timing of labels, synthetic conventions (Sections 4.2, 7.1, 7.3, 8.2; Tables S4–S6, Note S1) | 15 min |  |
+| `python src/risk_decode_baselines.py` | Risk-sensitive decoding for the TF-IDF baseline and the pipeline (Section 7.5, Table S7) | 1.5 h |  |
+| `python src/fig1_rule_agreement.py`, `python src/fig2_protocol.py` | Figures 1 and 2 | seconds |  |
 
 On Windows, `python -X utf8 ...` avoids console encoding errors.
 
