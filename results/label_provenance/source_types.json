@@ -1,0 +1,66 @@
+{
+ "VulDB": {
+  "type": "derived",
+  "FD_oos_pre2026": 0.9297413793103448,
+  "n_pairs_pre2026": 7731
+ },
+ "GitHub_M": {
+  "type": "v4_only",
+  "n_v4_pre2026": 1529
+ },
+ "VulnCheck": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.4084507042253521,
+  "n_pairs_pre2026": 236
+ },
+ "siemens": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.7707006369426752,
+  "n_pairs_pre2026": 523
+ },
+ "icscert": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.6611570247933884,
+  "n_pairs_pre2026": 401
+ },
+ "intel": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.4765625,
+  "n_pairs_pre2026": 424
+ },
+ "INCIBE": {
+  "type": "v4_only",
+  "n_v4_pre2026": 369
+ },
+ "CERT-PL": {
+  "type": "v4_only",
+  "n_v4_pre2026": 204
+ },
+ "juniper": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.5166666666666667,
+  "n_pairs_pre2026": 199
+ },
+ "qnap": {
+  "type": "v4_only",
+  "n_v4_pre2026": 186
+ },
+ "Liferay": {
+  "type": "v4_only",
+  "n_v4_pre2026": 145
+ },
+ "ABB": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.375,
+  "n_pairs_pre2026": 105
+ },
+ "twcert": {
+  "type": "independent",
+  "FD_oos_pre2026": 0.8333333333333334,
+  "n_pairs_pre2026": 117
+ },
+ "palo_alto": {
+  "type": "v4_only",
+  "n_v4_pre2026": 103
+ }
+}

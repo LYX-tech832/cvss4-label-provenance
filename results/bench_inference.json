@@ -1,0 +1,18 @@
+{
+ "n_sampled_cves": 500,
+ "single_latency_n_cves": 100,
+ "batch32_n_cves": 500,
+ "max_len": 256,
+ "mean_tokens": 105.378,
+ "median_tokens": 91.0,
+ "single_latency_ms_median": 299.3339500003458,
+ "single_latency_ms_p95": 545.2608199996574,
+ "batch32_total_s": 198.34031349999987,
+ "batch32_cves_per_s": 2.5209196818174857,
+ "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+ "logical_cores": 8,
+ "torch_threads": 4,
+ "torch": "2.11.0+cpu",
+ "transformers": "5.8.0",
+ "precision": "float32"
+}

@@ -1,0 +1,88 @@
+{
+ "n": 200,
+ "model": "deepseek-v4-pro",
+ "prompt": "DTD",
+ "thinking": "disabled",
+ "reasoning_effort": null,
+ "usage_total": {
+  "prompt_tokens": 2439263,
+  "prompt_cache_hit_tokens": 2316416,
+  "prompt_cache_miss_tokens": 122847,
+  "completion_tokens": 33575,
+  "reasoning_tokens": 0
+ },
+ "versions": {
+  "instructor": "1.17.0",
+  "openai": "2.36.0",
+  "langfuse": "2.60.10"
+ },
+ "fallback_rate": {
+  "AV": 0.005,
+  "AC": 0.01,
+  "AT": 0.02,
+  "PR": 0.02,
+  "UI": 0.015,
+  "VC": 0.08,
+  "VI": 0.08,
+  "VA": 0.185,
+  "SC": 0.23,
+  "SI": 0.235,
+  "SA": 0.165
+ },
+ "overall": {
+  "n": 200,
+  "mean_macro_f1": 0.5012173471022711,
+  "exact_match": 0.055,
+  "score_mae": 1.8114999999999997,
+  "band_acc": 0.365,
+  "under_rate": 0.16,
+  "hc_recall": 0.8571428571428571,
+  "spearman": 0.36714823442031763
+ },
+ "by_type": {
+  "derived": {
+   "n": 30,
+   "mean_macro_f1": 0.41242988825680166,
+   "exact_match": 0.03333333333333333,
+   "score_mae": 2.94,
+   "band_acc": 0.1,
+   "under_rate": 0.06666666666666667,
+   "hc_recall": 1.0,
+   "spearman": 0.61585021170336,
+   "v4_specific_f1": 0.39133718263747974
+  },
+  "independent": {
+   "n": 70,
+   "mean_macro_f1": 0.5210737392525648,
+   "exact_match": 0.02857142857142857,
+   "score_mae": 1.3271428571428572,
+   "band_acc": 0.44285714285714284,
+   "under_rate": 0.15714285714285714,
+   "hc_recall": 0.88,
+   "spearman": 0.47091222021134105,
+   "v4_specific_f1": 0.41016732869449485
+  },
+  "v4_only": {
+   "n": 50,
+   "mean_macro_f1": 0.47475083308444793,
+   "exact_match": 0.08,
+   "score_mae": 1.786,
+   "band_acc": 0.42,
+   "under_rate": 0.16,
+   "hc_recall": 0.9166666666666666,
+   "spearman": 0.4274562217749565,
+   "v4_specific_f1": 0.45339141829835733
+  },
+  "other": {
+   "n": 50,
+   "mean_macro_f1": 0.4776099364116327,
+   "exact_match": 0.08,
+   "score_mae": 1.838,
+   "band_acc": 0.36,
+   "under_rate": 0.22,
+   "hc_recall": 0.7407407407407407,
+   "spearman": 0.34396852973604075,
+   "v4_specific_f1": 0.3817683962558822
+  }
+ }
+}

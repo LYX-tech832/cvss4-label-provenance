@@ -1,0 +1,91 @@
+{
+ "n": 2000,
+ "model": "Qwen3-8B",
+ "prompt": "DTD",
+ "thinking": "disabled",
+ "thinking_style": "qwen",
+ "reasoning_effort": null,
+ "temperature": null,
+ "base_url": "http://localhost:8000/v1",
+ "usage_total": {
+  "prompt_tokens": 23967971,
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 0,
+  "completion_tokens": 309539,
+  "reasoning_tokens": 0
+ },
+ "versions": {
+  "instructor": "1.17.0",
+  "openai": "3.3.0",
+  "langfuse": "2.60.10"
+ },
+ "fallback_rate": {
+  "AV": 0.0085,
+  "AC": 0.041,
+  "AT": 0.2115,
+  "PR": 0.027,
+  "UI": 0.04,
+  "VC": 0.0345,
+  "VI": 0.0475,
+  "VA": 0.028,
+  "SC": 0.0515,
+  "SI": 0.023,
+  "SA": 0.033
+ },
+ "overall": {
+  "n": 2000,
+  "mean_macro_f1": 0.47938150245457983,
+  "exact_match": 0.0115,
+  "score_mae": 2.5665500000000003,
+  "band_acc": 0.312,
+  "under_rate": 0.4205,
+  "hc_recall": 0.6272991287512101,
+  "spearman": 0.3932336041143711
+ },
+ "by_type": {
+  "derived": {
+   "n": 300,
+   "mean_macro_f1": 0.39019818364304354,
+   "exact_match": 0.0,
+   "score_mae": 3.7093333333333334,
+   "band_acc": 0.09333333333333334,
+   "under_rate": 0.5066666666666667,
+   "hc_recall": 0.8666666666666667,
+   "spearman": 0.4078437828702865,
+   "v4_specific_f1": 0.3822152194131757
+  },
+  "independent": {
+   "n": 700,
+   "mean_macro_f1": 0.484072021772527,
+   "exact_match": 0.012857142857142857,
+   "score_mae": 1.9045714285714284,
+   "band_acc": 0.38857142857142857,
+   "under_rate": 0.3314285714285714,
+   "hc_recall": 0.6822222222222222,
+   "spearman": 0.40896190128225385,
+   "v4_specific_f1": 0.4042685949434155
+  },
+  "v4_only": {
+   "n": 500,
+   "mean_macro_f1": 0.4462647939190625,
+   "exact_match": 0.006,
+   "score_mae": 2.968,
+   "band_acc": 0.292,
+   "under_rate": 0.514,
+   "hc_recall": 0.5307692307692308,
+   "spearman": 0.3636180511259994,
+   "v4_specific_f1": 0.41417381927859304
+  },
+  "other": {
+   "n": 500,
+   "mean_macro_f1": 0.5145951004737503,
+   "exact_match": 0.022,
+   "score_mae": 2.4061999999999997,
+   "band_acc": 0.356,
+   "under_rate": 0.4,
+   "hc_recall": 0.5899280575539568,
+   "spearman": 0.36518374498094924,
+   "v4_specific_f1": 0.4573762418026318
+  }
+ }
+}

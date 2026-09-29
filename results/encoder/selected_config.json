@@ -1,0 +1,12 @@
+{
+ "none": {
+  "val_best_mean_f1": 0.6646306248595477,
+  "run": "T2_temporal_deberta-v3-base_none_e5_cwinv_sqrt_s0",
+  "args": "--epochs 5 --class_weight inv_sqrt"
+ },
+ "aux": {
+  "val_best_mean_f1": 0.6947597879047231,
+  "run": "T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s0",
+  "args": "--epochs 5 --class_weight inv_sqrt --aux_v31 --aux_lambda 0.5"
+ }
+}
