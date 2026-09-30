@@ -56,12 +56,13 @@ Each command rewrites a result file under `results/`. With the included predicti
 | `python src/review_checks2.py` | Training randomness, test-set weighting, per-metric inflation, near-duplicates, timing of labels, synthetic conventions (Sections 4.2, 7.1, 7.3, 8.2; Tables S4–S6, Note S1) | 15 min |
 | `python src/risk_decode_baselines.py` | Risk-sensitive decoding for the TF-IDF baseline and the pipeline (Section 7.5, Table S7) | 1.5 h |
 | `python src/fig1_rule_agreement.py`, `python src/fig2_protocol.py` | Figures 1 and 2 | seconds |
+| `python src/review_gpu_summary.py` (added on 30 September 2026) | Ten-epoch training, pseudo-labels and DeBERTa pipeline (Sections 7.3 and 7.4, Tables S10 and S11) | 20 min |
 
 On Windows, `python -X utf8 ...` avoids console encoding errors.
 
 ## Training the encoders (GPU)
 
-`src/train_encoder.py` trains DeBERTa-v3-base with or without the v3.1 auxiliary task (`--aux_v31`), the CWE control (`--aux_cwe --no_cwe_in_text`) and the label-efficiency variants (`--train_frac`). The scripts in `scripts/` run the full experiment batches (`run_w4_all.sh`: configuration search and five seeds on four splits; `run_w5_label_eff.sh`: label efficiency; `run_cwe_control.sh`: CWE control). `src/risk_decode.py` adds risk-sensitive decoding to finished runs.
+`src/train_encoder.py` trains DeBERTa-v3-base with or without the v3.1 auxiliary task (`--aux_v31`), the CWE control (`--aux_cwe --no_cwe_in_text`), the label-efficiency variants (`--train_frac`), rule-R pseudo-labels (`--pseudo_v4`) and the DeBERTa pipeline (`--v31_only`). The scripts in `scripts/` run the full experiment batches (`run_w4_all.sh`: configuration search and five seeds on four splits; `run_w5_label_eff.sh`: label efficiency; `run_cwe_control.sh`: CWE control; `run_review_gpu.sh`: ten-epoch training, pseudo-labels and pipeline). `src/risk_decode.py` adds risk-sensitive decoding to finished runs.
 
 ## LLM baselines
 

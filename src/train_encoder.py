@@ -83,6 +83,7 @@ class CVEDataset(Dataset):
         self.texts = [build_text(r, task, with_source) for _, r in df.iterrows()]
         self.labels = label_matrix(df, "y_", L2I)
         self.labels31 = label_matrix(df, "z_", L2I31)
+        self.labels_ps = label_matrix(df, "p_", L2I)  # --pseudo_v4：辅助样本的 v4 伪标签（规则 R 换算），其余样本为 IGNORE
         self.labels_cwe = (df["c_CWE"].fillna(IGNORE).astype(np.int64).values if "c_CWE" in df
                            else np.full(len(df), IGNORE, dtype=np.int64))  # 只有 --aux_cwe 时训练集才有这一列
         self.src = df["source"].map(lambda s: source_index.get(s, source_index["__OTHER__"])).values
@@ -92,14 +93,15 @@ class CVEDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, i):
-        return self.texts[i], self.labels[i], self.labels31[i], self.src[i], self.labels_cwe[i]
+        return self.texts[i], self.labels[i], self.labels31[i], self.src[i], self.labels_cwe[i], self.labels_ps[i]
 
     def collate(self, batch):
-        texts, labels, labels31, src, labels_cwe = zip(*batch)
+        texts, labels, labels31, src, labels_cwe, labels_ps = zip(*batch)
         enc = self.tok(list(texts), truncation=True, max_length=self.max_len, padding=True, return_tensors="pt")
         enc["labels"] = torch.tensor(np.stack(labels))
         enc["labels31"] = torch.tensor(np.stack(labels31))
         enc["labels_cwe"] = torch.tensor(np.array(labels_cwe, dtype=np.int64))
+        enc["labels_ps"] = torch.tensor(np.stack(labels_ps))
         enc["src"] = torch.tensor(src)
         return enc
 
@@ -176,7 +178,7 @@ def class_weights(train, mode, device):
     return out
 
 
-def compute_loss(model, logits, labels, labels31, src, args, cw=None, labels_cwe=None):
+def compute_loss(model, logits, labels, labels31, src, args, cw=None, labels_cwe=None, labels_ps=None):
     cw = cw or {}
     if args.source_mode == "crowd":
         probs = model.source_probs(logits, src)
@@ -186,7 +188,10 @@ def compute_loss(model, logits, labels, labels31, src, args, cw=None, labels_cwe
         loss = sum(masked_nll(F.log_softmax(logits[k], -1), labels[:, i], cw.get(k)) for i, k in enumerate(M40)) / len(M40)
     if model.aux_heads is not None:
         aux = sum(masked_nll(F.log_softmax(logits["v31_" + k], -1), labels31[:, i]) for i, k in enumerate(V31_METRICS)) / len(V31_METRICS)
-        loss = loss + args.aux_lambda * aux
+        loss = loss + (1.0 if args.v31_only else args.aux_lambda) * aux  # 流水线只有 v3.1 这一项损失
+    if args.pseudo_v4 and labels_ps is not None:  # 伪标签对照：与 v4 真标签同样的类别权重，整体乘 λ（与辅助任务的权重相同）
+        ps = sum(masked_nll(F.log_softmax(logits[k], -1), labels_ps[:, i], cw.get(k)) for i, k in enumerate(M40)) / len(M40)
+        loss = loss + args.aux_lambda * ps
     if getattr(model, "cwe_head", None) is not None and labels_cwe is not None:
         loss = loss + args.aux_lambda * masked_nll(F.log_softmax(logits["cwe"], -1), labels_cwe)
     return loss
@@ -207,6 +212,22 @@ def predict(model, loader, device, amp_dtype, use_source_T=False):
     probs_all = {k: np.concatenate(v) for k, v in probs_all.items()}
     preds = pd.DataFrame({k: np.array(LABELS[k])[p.argmax(1)] for k, p in probs_all.items()})
     return preds, probs_all
+
+
+@torch.no_grad()
+def predict_pipeline(model, loader, device, amp_dtype):
+    """流水线（--v31_only）：用 v3.1 头预测 v3.1 向量，再按规则 R 换算成 v4.0 向量。"""
+    from rq1_stats import rule_convert
+    model.eval()
+    preds = {k: [] for k in V31_METRICS}
+    for batch in loader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=amp_dtype is not None):
+            logits = model(batch["input_ids"], batch["attention_mask"])
+        for k in V31_METRICS:
+            preds[k].append(logits["v31_" + k].float().argmax(-1).cpu().numpy())
+    v31 = pd.DataFrame({k: np.array(V31_METRICS[k])[np.concatenate(v)] for k, v in preds.items()})
+    return pd.DataFrame([rule_convert({k: r[k] for k in M31}) for _, r in v31.iterrows()])[M40]
 
 
 # ---------------- 划分 ----------------
@@ -265,6 +286,10 @@ def main():
     ap.add_argument("--cwe_top", type=int, default=50, help="CWE 辅助任务保留的类别数（其余并为'其他'）")
     ap.add_argument("--no_cwe_in_text", action="store_true",
                     help="输入只用描述、去掉 CWE 编号；CWE 辅助对照必须加，否则模型可以直接从输入里抄出答案")
+    ap.add_argument("--pseudo_v4", action="store_true",
+                    help="伪标签对照：辅助样本（与 --aux_v31 相同的池和种子）的 v3.1 向量按规则 R 换算成 v4 伪标签，直接监督 v4 头，损失权重 λ")
+    ap.add_argument("--v31_only", action="store_true",
+                    help="DeBERTa 版流水线：只用辅助样本训练 v3.1 头（不用任何 v4 标签），预测时把 v3.1 向量按规则 R 换算成 v4")
     ap.add_argument("--out", default=None)
     ap.add_argument("--skip_existing", action="store_true", help="结果已存在（results.json）时直接跳过，便于中断后续跑")
     ap.add_argument("--smoke_test", action="store_true")
@@ -275,12 +300,16 @@ def main():
         ap.error("--aux_v31 与 --aux_cwe 只能二选一")
     if args.aux_cwe and args.task == "T1":
         ap.error("--aux_cwe 只用于 T2")
+    if sum([args.aux_v31, args.aux_cwe, args.pseudo_v4, args.v31_only]) > 1:
+        ap.error("--aux_v31、--aux_cwe、--pseudo_v4、--v31_only 只能选一个")
+    if (args.pseudo_v4 or args.v31_only) and args.task == "T1":
+        ap.error("--pseudo_v4 与 --v31_only 只用于 T2")
     if args.smoke_test:
         args.epochs, args.batch_size, args.model = 1, 16, "smoke-bert-tiny"
 
     # 运行名：默认超参数（3 轮、无类别加权、λ=0.5）时与 W3 的命名一致；非默认值自动加后缀，避免覆盖
     suffix = ""
-    if (args.aux_v31 or args.aux_cwe) and args.aux_lambda != 0.5:
+    if (args.aux_v31 or args.aux_cwe or args.pseudo_v4) and args.aux_lambda != 0.5:
         suffix += f"_lam{args.aux_lambda:g}"
     if args.epochs != 3:
         suffix += f"_e{args.epochs}"
@@ -290,6 +319,7 @@ def main():
         suffix += f"_frac{args.train_frac:g}"
     run_name = args.out or (f"{args.task}_{args.split.replace(':', '-')}_{Path(args.model).name}_{args.source_mode}"
                             f"{'_aux' if args.aux_v31 else ''}{'_auxcwe' if args.aux_cwe else ''}"
+                            f"{'_pseudo' if args.pseudo_v4 else ''}{'_v31only' if args.v31_only else ''}"
                             f"{'_desconly' if args.no_cwe_in_text else ''}{suffix}_s{args.seed}")
     out_dir = ROOT / "results" / "encoder" / run_name
     if args.skip_existing and (out_dir / "results.json").exists():
@@ -312,15 +342,25 @@ def main():
     if args.train_frac < 1:  # 标签效率实验：只在训练部分抽样，验证集固定（仍是最晚的 10%），辅助样本在下面照常加入
         train = train.sample(frac=args.train_frac, random_state=args.seed)
         print(f"只用 {args.train_frac:g} 的 v4 训练标签：{len(train):,} 条", flush=True)
-    if args.aux_v31 or args.aux_cwe:  # 两种辅助任务用完全相同的辅助样本（同一个池、同一个种子）
+    if args.aux_v31 or args.aux_cwe or args.pseudo_v4 or args.v31_only:  # 各种用法都取完全相同的辅助样本（同一个池、同一个种子）
         heldout = args.split.split(":", 1)[1] if args.split.startswith("loso:") else None
         aux = aux_pool(args.split, heldout, 300 if args.smoke_test else args.aux_max, args.seed)
-        print(f"辅助样本（只有 v3.1 的 CVE，监督用{'其 v3.1 标签' if args.aux_v31 else '其 CWE 类别'}）：{len(aux):,} 条", flush=True)
+        use = {"aux_v31": "其 v3.1 标签", "aux_cwe": "其 CWE 类别", "pseudo_v4": "规则 R 换算出的 v4 伪标签", "v31_only": "其 v3.1 标签（流水线，不用 v4 标签）"}
+        print(f"辅助样本（只有 v3.1 的 CVE，监督用{next(v for k, v in use.items() if getattr(args, k))}）：{len(aux):,} 条", flush=True)
         aux["cwe1"] = [first_cwe(a, b) for a, b in zip(aux["cwe_cna"], aux["cwe_adp"])]
         if args.no_cwe_in_text:
             aux["text"] = aux["description"].str.strip()
-        cols = ["text", "source", "pub"] + (["z_" + k for k in M31] if args.aux_v31 else ["cwe1"])
-        train = pd.concat([train, aux[cols]], ignore_index=True)
+        if args.pseudo_v4:
+            from rq1_stats import rule_convert
+            conv = [rule_convert({k: r["z_" + k] for k in M31}) for _, r in aux.iterrows()]
+            for k in M40:
+                aux["p_" + k] = [c[k] for c in conv]
+        cols = ["text", "source", "pub"] + (["z_" + k for k in M31] if (args.aux_v31 or args.v31_only) else
+                                            ["p_" + k for k in M40] if args.pseudo_v4 else ["cwe1"])
+        if args.v31_only:  # 流水线不使用任何 v4 训练标签：训练集只剩辅助样本
+            train = aux[cols].reset_index(drop=True)
+        else:
+            train = pd.concat([train, aux[cols]], ignore_index=True)
     cwe_vocab = None
     if args.aux_cwe:  # CWE 类别表只用训练部分（v4 训练样本 + 辅助样本）建立
         cwe_vocab = train["cwe1"].dropna().value_counts().head(args.cwe_top).index.tolist()
@@ -334,7 +374,8 @@ def main():
         print(f"CWE 辅助任务：{len(cwe_vocab) + 1} 类（前 {len(cwe_vocab)} 个 CWE + 其他）；训练样本中有 CWE 的占 {train['c_CWE'].notna().mean():.1%}"
               f"（v4 样本 {cwe_info['cwe_coverage_v4']:.1%}，辅助样本 {cwe_info['cwe_coverage_aux']:.1%}；归入'其他'的占 {cwe_info['share_other']:.1%}）", flush=True)
 
-    top = train[train["y_AV"].notna()]["source"].value_counts().head(args.top_sources).index.tolist()  # 只按有 v4 标签的样本选来源
+    has_v4 = train["y_AV"].notna() if "y_AV" in train else pd.Series(False, index=train.index)
+    top = train[has_v4]["source"].value_counts().head(args.top_sources).index.tolist()  # 只按有 v4 标签的样本选来源
     source_index = {s: i for i, s in enumerate(top)}
     source_index["__OTHER__"] = len(top)
 
@@ -353,7 +394,7 @@ def main():
     ds = {n: CVEDataset(d, tok, args.max_len, args.task, with_source, source_index) for n, d in [("train", train), ("val", val), ("test", test)]}
     loaders = {n: DataLoader(d, batch_size=args.batch_size, shuffle=(n == "train"), collate_fn=d.collate) for n, d in ds.items()}
 
-    model = MultiHeadCVSS(encoder, hidden, len(source_index), args.source_mode, aux_v31=args.aux_v31,
+    model = MultiHeadCVSS(encoder, hidden, len(source_index), args.source_mode, aux_v31=args.aux_v31 or args.v31_only,
                           n_cwe=(len(cwe_vocab) + 1) if args.aux_cwe else 0).to(device)
     enc_params = list(model.encoder.parameters())
     other = [p for n, p in model.named_parameters() if not n.startswith("encoder.")]
@@ -361,7 +402,7 @@ def main():
     total = args.epochs * len(loaders["train"])
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, (s + 1) / max(1, int(0.06 * total))) * max(0.0, (total - s) / total))
 
-    cw = class_weights(train, args.class_weight, device)
+    cw = class_weights(train, args.class_weight, device) if "y_AV" in train else None
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "args.json").write_text(json.dumps(vars(args), indent=1), encoding="utf-8")
     if cwe_vocab is not None:
@@ -376,7 +417,7 @@ def main():
             with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=amp_dtype is not None):
                 logits = model(batch["input_ids"], batch["attention_mask"])
             loss = compute_loss(model, {k: v.float() for k, v in logits.items()}, batch["labels"], batch["labels31"], batch["src"], args, cw,
-                                labels_cwe=batch["labels_cwe"])
+                                labels_cwe=batch["labels_cwe"], labels_ps=batch["labels_ps"])
             # 发散保护：loss 连续 20 步为 NaN/Inf 就终止本次运行（无人值守时避免白白消耗 GPU）
             nan_steps = nan_steps + 1 if not torch.isfinite(loss) else 0
             if nan_steps >= 20:
@@ -389,7 +430,7 @@ def main():
             if step % 100 == 0:
                 print(f"epoch {epoch} step {step}/{len(loaders['train'])} loss {loss.item():.4f} ({time.time() - t0:.0f}s)", flush=True)
         # 用验证集的平均 Macro-F1 选最佳 epoch（验证集不看测试标签）
-        val_pred, _ = predict(model, loaders["val"], device, amp_dtype)
+        val_pred = predict_pipeline(model, loaders["val"], device, amp_dtype) if args.v31_only else predict(model, loaders["val"], device, amp_dtype)[0]
         val_res = evaluate(val.reset_index(drop=True), val_pred)
         log.append({"epoch": epoch, "val_mean_macro_f1": val_res["mean_macro_f1"], "val_band_acc": val_res["band_acc"],
                     "val_under_rate": val_res["under_rate"]})
@@ -400,15 +441,19 @@ def main():
 
     model.load_state_dict(best_state)
     test_r = test.reset_index(drop=True)
-    pred, test_probs = predict(model, loaders["test"], device, amp_dtype)
-    _, val_probs = predict(model, loaders["val"], device, amp_dtype)
+    if args.v31_only:  # 流水线的 v4 头没有训练过，只保存换算后的预测
+        pred = predict_pipeline(model, loaders["test"], device, amp_dtype)
+    else:
+        pred, test_probs = predict(model, loaders["test"], device, amp_dtype)
+        _, val_probs = predict(model, loaders["val"], device, amp_dtype)
     results = {"val_log": log, "best_epoch": best_epoch, "val_best_mean_f1": best_f1, "latent": evaluate(test_r, pred)}
     pred.assign(cve_id=test_r["cve_id"], source=test_r["source"]).to_parquet(out_dir / "pred_latent.parquet", index=False)
-    # 保存最佳 epoch 在验证集与测试集上的各指标概率（风险敏感解码、校准分析、种子集成都要用）
-    np.savez_compressed(out_dir / "probs.npz",
-                        val_cve_id=val["cve_id"].to_numpy(dtype=str), test_cve_id=test_r["cve_id"].to_numpy(dtype=str),
-                        **{f"val_{k}": v.astype(np.float16) for k, v in val_probs.items()},
-                        **{f"test_{k}": v.astype(np.float16) for k, v in test_probs.items()})
+    if not args.v31_only:
+        # 保存最佳 epoch 在验证集与测试集上的各指标概率（风险敏感解码、校准分析、种子集成都要用）
+        np.savez_compressed(out_dir / "probs.npz",
+                            val_cve_id=val["cve_id"].to_numpy(dtype=str), test_cve_id=test_r["cve_id"].to_numpy(dtype=str),
+                            **{f"val_{k}": v.astype(np.float16) for k, v in val_probs.items()},
+                            **{f"test_{k}": v.astype(np.float16) for k, v in test_probs.items()})
     if args.source_mode == "crowd":
         pred_s, _ = predict(model, loaders["test"], device, amp_dtype, use_source_T=True)
         results["with_source_T"] = evaluate(test_r, pred_s)
