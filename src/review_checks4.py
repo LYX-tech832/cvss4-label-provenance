@@ -55,12 +55,14 @@ def main():
             nw = np.mean([np.mean([r["per_metric"][k]["macro_f1"] for k in ["AT", "SC", "SI", "SA"]]) for r in rs])
             lines.append(f"| {v} | {len(ps)} | {np.mean([r['mean_macro_f1'] for r in rs]):.3f} | {sh:.3f} | {nw:.3f} | {np.mean([r['band_acc'] for r in rs]):.3f} |")
         rng = np.random.default_rng(0)
-        lines += ["\n配对 bootstrap（A − B，平均宏 F1 / 等级准确率，95% 区间）：\n", "| A − B | 平均宏 F1 差 | 等级准确率差 |", "|---|---|---|"]
+        lines += ["\n配对 bootstrap（A − B，平均宏 F1 / 等级准确率，95% 区间；两个版本种子数不同时只用共同的种子 0–2）：\n", "| A − B | 平均宏 F1 差 | 等级准确率差 |", "|---|---|---|"]
         for a, b in [("v3.1 辅助 5 轮", "无辅助 5 轮"), ("v3.1 辅助 10 轮", "无辅助 10 轮"), ("伪标签 5 轮", "无辅助 5 轮"),
                      ("v3.1 辅助 5 轮", "伪标签 5 轮"), ("DeBERTa 流水线", "无辅助 5 轮")]:
+            k = min(len(enc[a]), len(enc[b]))  # 种子数不同时只比较共同的种子（都从 0 开始），10-01 第五份审稿意见指出原先未匹配
+
             def d(ix):
-                fa = [fast_scores(t, e, ix) for e in enc[a]]
-                fb = [fast_scores(t, e, ix) for e in enc[b]]
+                fa = [fast_scores(t, e, ix) for e in enc[a][:k]]
+                fb = [fast_scores(t, e, ix) for e in enc[b][:k]]
                 return (np.mean([x["mean_macro_f1"] for x in fa]) - np.mean([x["mean_macro_f1"] for x in fb]),
                         np.mean([x["band_acc"] for x in fa]) - np.mean([x["band_acc"] for x in fb]))
             pt = d(idx)

@@ -57,6 +57,7 @@ Each command rewrites a result file under `results/`. With the included predicti
 | `python src/risk_decode_baselines.py` | Risk-sensitive decoding for the TF-IDF baseline and the pipeline (Section 7.5, Table S7) | 1.5 h |
 | `python src/fig1_rule_agreement.py`, `python src/fig2_protocol.py` | Figures 1 and 2 | seconds |
 | `python src/review_checks3.py` (added on 30 September 2026) | VulnCheck share, per-metric accuracy, VulnCheck treated as derived, value distributions (Sections 4.3, 5.3, 7.1, 8.2; Table S12) | 3 min |
+| `python src/review_checks5.py` (added on 1 October 2026) | Label-substitution control: the same predictions scored against original and rule-R-converted labels (Section 7.1; Table S15) | 5 min |
 | `python src/review_checks4.py` (added on 1 October 2026) | Transfer gains on labels that differ from rule R, bias of AT towards None, 5% labels on these subsets (Sections 7.3 and 7.4; Table S14) | 15 min |
 | `python src/review_gpu_summary.py` (added on 30 September 2026) | Ten-epoch training, pseudo-labels and DeBERTa pipeline (Sections 7.3 and 7.4, Tables S10 and S11) | 20 min |
 
