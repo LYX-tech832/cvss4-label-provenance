@@ -106,13 +106,18 @@ class CVEDataset(Dataset):
         return enc
 
 
-def aux_pool(split, heldout_source, max_n, seed):
-    """辅助任务样本：只有 v3.1、没有 CNA v4.0 的 CVE。时间划分时只用 2026 年前的；留一来源时去掉被留出的来源。"""
+def aux_pool(split, heldout_source, max_n, seed, exclude=None):
+    """辅助任务样本：只有 v3.1、没有 CNA v4.0 的 CVE。时间划分时只用 2026 年前的；留一来源时去掉被留出的来源。
+    exclude：要先去掉的 CVE（--exclude_ids 的 pool 键），在抽样之前去掉，所以样本数不变（池子够大时）。"""
     from pilot_transfer import v31_pool  # 延迟导入：只有 --aux_v31 时才需要
     pool = v31_pool() if split == "temporal" else v31_pool(before_cutoff=False)
     pool["source"] = pool["cna_short_name"].fillna("UNKNOWN")
     if heldout_source:
         pool = pool[pool["source"] != heldout_source]
+    if exclude:
+        n0 = len(pool)
+        pool = pool[~pool["cve_id"].isin(exclude)]
+        print(f"辅助样本池去掉截止日期后更新过的 {n0 - len(pool):,} 条，剩 {len(pool):,} 条", flush=True)
     if len(pool) > max_n:
         pool = pool.sample(max_n, random_state=seed)
     return pool
@@ -286,6 +291,11 @@ def main():
     ap.add_argument("--cwe_top", type=int, default=50, help="CWE 辅助任务保留的类别数（其余并为'其他'）")
     ap.add_argument("--no_cwe_in_text", action="store_true",
                     help="输入只用描述、去掉 CWE 编号；CWE 辅助对照必须加，否则模型可以直接从输入里抄出答案")
+    ap.add_argument("--aux_shuffle", action="store_true",
+                    help="负对照（与 --aux_v31 同用）：把所有用于辅助任务的 v3.1 向量在样本之间整体打乱，保留标签分布与数据量，只破坏标签与描述的对应关系")
+    ap.add_argument("--exclude_ids", default=None,
+                    help="时间信息敏感性（第二轮审稿 P2）：src/late_update_ids.py 生成的 JSON；从 2026 年前的 v4 训练/验证样本（键 v4）"
+                         "和辅助样本池（键 pool）里去掉容器在截止日期后更新过的 CVE；只用于时间划分")
     ap.add_argument("--pseudo_v4", action="store_true",
                     help="伪标签对照：辅助样本（与 --aux_v31 相同的池和种子）的 v3.1 向量按规则 R 换算成 v4 伪标签，直接监督 v4 头，损失权重 λ")
     ap.add_argument("--v31_only", action="store_true",
@@ -300,6 +310,8 @@ def main():
         ap.error("--aux_v31 与 --aux_cwe 只能二选一")
     if args.aux_cwe and args.task == "T1":
         ap.error("--aux_cwe 只用于 T2")
+    if args.aux_shuffle and not args.aux_v31:
+        ap.error("--aux_shuffle 只能与 --aux_v31 一起用")
     if sum([args.aux_v31, args.aux_cwe, args.pseudo_v4, args.v31_only]) > 1:
         ap.error("--aux_v31、--aux_cwe、--pseudo_v4、--v31_only 只能选一个")
     if (args.pseudo_v4 or args.v31_only) and args.task == "T1":
@@ -317,8 +329,12 @@ def main():
         suffix += f"_cw{args.class_weight}"
     if args.train_frac < 1:
         suffix += f"_frac{args.train_frac:g}"
+    if args.exclude_ids:
+        if args.split != "temporal":
+            ap.error("--exclude_ids 只用于时间划分")
+        suffix += "_xlate"
     run_name = args.out or (f"{args.task}_{args.split.replace(':', '-')}_{Path(args.model).name}_{args.source_mode}"
-                            f"{'_aux' if args.aux_v31 else ''}{'_auxcwe' if args.aux_cwe else ''}"
+                            f"{'_aux' if args.aux_v31 else ''}{'shuf' if args.aux_shuffle else ''}{'_auxcwe' if args.aux_cwe else ''}"
                             f"{'_pseudo' if args.pseudo_v4 else ''}{'_v31only' if args.v31_only else ''}"
                             f"{'_desconly' if args.no_cwe_in_text else ''}{suffix}_s{args.seed}")
     out_dir = ROOT / "results" / "encoder" / run_name
@@ -336,6 +352,11 @@ def main():
     df["cwe1"] = [first_cwe(a, b) for a, b in zip(df["cwe_cna"], df["cwe_adp"])]
     if args.no_cwe_in_text:
         df["text"] = df["description"].str.strip()
+    excl = json.loads(Path(args.exclude_ids).read_text(encoding="utf-8")) if args.exclude_ids else None
+    if excl:  # 只去掉 2026 年前的 v4 样本（训练与验证）；测试集不变
+        drop = df["cve_id"].isin(set(excl["v4"])) & (df["pub"] < CUTOFF)
+        df = df[~drop]
+        print(f"v4 训练/验证样本去掉截止日期后更新过的 {int(drop.sum()):,} 条", flush=True)
     train, val, test = make_split(df, args.split, args.task)
     if args.smoke_test:
         train, val, test = train.sample(400, random_state=0), val.sample(100, random_state=0), test.sample(200, random_state=0)
@@ -344,7 +365,8 @@ def main():
         print(f"只用 {args.train_frac:g} 的 v4 训练标签：{len(train):,} 条", flush=True)
     if args.aux_v31 or args.aux_cwe or args.pseudo_v4 or args.v31_only:  # 各种用法都取完全相同的辅助样本（同一个池、同一个种子）
         heldout = args.split.split(":", 1)[1] if args.split.startswith("loso:") else None
-        aux = aux_pool(args.split, heldout, 300 if args.smoke_test else args.aux_max, args.seed)
+        aux = aux_pool(args.split, heldout, 300 if args.smoke_test else args.aux_max, args.seed,
+                       exclude=set(excl["pool"]) if excl else None)
         use = {"aux_v31": "其 v3.1 标签", "aux_cwe": "其 CWE 类别", "pseudo_v4": "规则 R 换算出的 v4 伪标签", "v31_only": "其 v3.1 标签（流水线，不用 v4 标签）"}
         print(f"辅助样本（只有 v3.1 的 CVE，监督用{next(v for k, v in use.items() if getattr(args, k))}）：{len(aux):,} 条", flush=True)
         aux["cwe1"] = [first_cwe(a, b) for a, b in zip(aux["cwe_cna"], aux["cwe_adp"])]
@@ -361,6 +383,12 @@ def main():
             train = aux[cols].reset_index(drop=True)
         else:
             train = pd.concat([train, aux[cols]], ignore_index=True)
+        if args.aux_shuffle:  # 整行打乱 v3.1 向量（v4 训练样本自带的 v3.1 与辅助样本一起），各指标之间的关系保持不变
+            zc = ["z_" + k for k in M31]
+            has = train[zc[0]].notna().to_numpy()
+            perm = np.random.default_rng(args.seed).permutation(int(has.sum()))
+            train.loc[has, zc] = train.loc[has, zc].to_numpy()[perm]
+            print(f"已打乱 {int(has.sum()):,} 条 v3.1 向量（负对照）", flush=True)
     cwe_vocab = None
     if args.aux_cwe:  # CWE 类别表只用训练部分（v4 训练样本 + 辅助样本）建立
         cwe_vocab = train["cwe1"].dropna().value_counts().head(args.cwe_top).index.tolist()

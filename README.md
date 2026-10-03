@@ -58,14 +58,24 @@ Each command rewrites a result file under `results/`. With the included predicti
 | `python src/fig1_rule_agreement.py`, `python src/fig2_protocol.py` | Figures 1 and 2 | seconds |
 | `python src/review_checks3.py` (added on 30 September 2026) | VulnCheck share, per-metric accuracy, VulnCheck treated as derived, value distributions (Sections 4.3, 5.3, 7.1, 8.2; Table S12) | 3 min |
 | `python src/review_checks5.py` (added on 1 October 2026) | Label-substitution control: the same predictions scored against original and rule-R-converted labels (Section 7.1; Table S15) | 5 min |
+| `python src/review_checks6.py` (added on 1 October 2026) | Calibration of the functional-dependence test, source characteristics, vendor-cluster bootstrap, macro-F1 over present values, decision-oriented metrics of risk-sensitive decoding (Sections 4.3, 7.1, 7.5, 8.2; Tables S16–S22) | about 30 min |
 | `python src/review_checks4.py` (added on 1 October 2026) | Transfer gains on labels that differ from rule R, bias of AT towards None, 5% labels on these subsets (Sections 7.3 and 7.4; Table S14) | 15 min |
 | `python src/review_gpu_summary.py` (added on 30 September 2026) | Ten-epoch training, pseudo-labels and DeBERTa pipeline (Sections 7.3 and 7.4, Tables S10 and S11) | 20 min |
+| `python src/review_checks7.py` (added on 2 October 2026) | Records with several vectors of one version; per-seed differences for the ten-epoch LOSO comparison (Section 4.1, Note S3, Table S23) | 5 min |
+| `python src/llm_reversal_runs.py` (added on 3 October 2026) | Ranking reversal with the LLM's sampling randomness: three complete DeepSeek-V4-Pro runs, two-level bootstrap (Section 7.1; Table S29); reads the stored answers, no API calls | 2 min |
+| `python src/review_checks8.py` (added on 3 October 2026) | Base-rate-corrected band accuracy and Cohen's κ per label type, TF-IDF baseline trained without VulDB's labels, rolling quarterly cut-offs (Section 7.1; Tables S26–S28) | 25 min |
+| `python src/review_tfidf_order.py` (added on 2 October 2026) | Cause of the small difference between the refitted TF-IDF models of Table S7 and Table 7 | 15 min |
+| `python src/late_update_ids.py` (added on 2 October 2026) | CVEs whose CNA or ADP container was updated after the temporal cut-off (needs `data/raw/cves.zip`; input to `train_encoder.py --exclude_ids`) | 5 min |
+| `python src/select_loso_config.py` (added on 2 October 2026) | Configuration selected on each split's own validation set (Table S25) | seconds |
+| `python src/review_gpu4_summary.py` (added on 3 October 2026) | Main comparison with the selected configurations, step-matched baseline, timing sensitivity (Sections 7.3 and 8.2; Tables 7 and S23) | 25 min |
+| `python src/review_gpu4_tables.py` (added on 3 October 2026) | Rows of Tables 7, 12 and S24 for the selected configurations | 5 min |
+| `python src/review_gpu2_summary.py` (added on 2 October 2026) | Shuffled-v3.1-label controls with all and with 5% of the v4.0 training labels, ten-epoch baselines on the LOSO splits (Sections 7.3 and 7.4; Tables S3, S10, S14 and S23) | 30 min |
 
 On Windows, `python -X utf8 ...` avoids console encoding errors.
 
 ## Training the encoders (GPU)
 
-`src/train_encoder.py` trains DeBERTa-v3-base with or without the v3.1 auxiliary task (`--aux_v31`), the CWE control (`--aux_cwe --no_cwe_in_text`), the label-efficiency variants (`--train_frac`), rule-R pseudo-labels (`--pseudo_v4`) and the DeBERTa pipeline (`--v31_only`). The scripts in `scripts/` run the full experiment batches (`run_w4_all.sh`: configuration search and five seeds on four splits; `run_w5_label_eff.sh`: label efficiency; `run_cwe_control.sh`: CWE control; `run_review_gpu.sh`: ten-epoch training, pseudo-labels and pipeline). `src/risk_decode.py` adds risk-sensitive decoding to finished runs.
+`src/train_encoder.py` trains DeBERTa-v3-base with or without the v3.1 auxiliary task (`--aux_v31`), the CWE control (`--aux_cwe --no_cwe_in_text`), the label-efficiency variants (`--train_frac`), rule-R pseudo-labels (`--pseudo_v4`), the DeBERTa pipeline (`--v31_only`) the shuffled-label control (`--aux_v31 --aux_shuffle`) and the exclusion of CVEs updated after the cut-off (`--exclude_ids`). The scripts in `scripts/` run the full experiment batches (`run_w4_all.sh`: configuration search and five seeds on four splits; `run_w5_label_eff.sh`: label efficiency; `run_cwe_control.sh`: CWE control; `run_review_gpu.sh`: ten-epoch training, pseudo-labels and pipeline; `run_review_gpu2.sh` and `run_review_gpu3.sh`: shuffled-label controls and ten-epoch LOSO baselines; `run_review_gpu4.sh`: configuration selection on each split's validation set, step-matched baseline and timing sensitivity). `src/risk_decode.py` adds risk-sensitive decoding to finished runs.
 
 ## LLM baselines
 

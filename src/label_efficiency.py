@@ -6,6 +6,7 @@
 输出：results/label_efficiency/summary.md、data.csv；图 3：paper/figures/fig3_label_efficiency.{pdf,png}
 """
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -78,6 +79,9 @@ def main():
                     lines.append(f"| {lab} | {'有辅助' if ver == 'aux' else '无辅助'} | {len(g)} | "
                                  + " | ".join(f"{g[k].mean():.3f} ± {g[k].std(ddof=1):.3f}" for k in KEYS) + " |")
 
+    if "--plot_only" in sys.argv:  # 10-03：只重画图 3，不重算汇总表
+        plot(df, data)
+        return
     lines += ["\n## 各比例的配对 bootstrap（有辅助 − 无辅助；种子 0–2 先平均；1,000 次；95% 区间）\n",
               "| v4 训练标签 | 口径 | 平均宏 F1 差 | 等级准确率差 | 低估率差 | 分数 MAE 差 |", "|---|---|---|---|---|---|"]
     for frac in FRACS:
@@ -91,17 +95,31 @@ def main():
             lines.append(f"| {frac:.0%} | {'全部' if scope == 'all' else '去掉 derived'} | {cells} |")
     (OUT / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
+    plot(df, data)
 
-    # 图 3：两栏（平均宏 F1、低估率），全部测试集，种子 0–2 的均值 ± 标准差
+
+def plot(df, data):
+    """图 3：两栏（平均宏 F1、低估率），全部测试集，种子 0–2 的均值 ± 标准差。
+    10-03（第三轮审稿）：按正文宽度 1:1 作图；纵轴写 Underestimation；加上表 7 选中的无辅助 25 轮模型（全部标签，种子 0–2）作参照；
+    图同步到 paper/latex/figures/（LaTeX 编译实际用这一份）。"""
+    ref = []
+    for s in range(3):
+        d = ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}"
+        pr = pd.read_parquet(d / "pred_latent.parquet")
+        tr = df.set_index("cve_id").loc[pr["cve_id"]].reset_index()
+        ref.append(evaluate(tr, pr))
     plt.rcParams.update({"font.family": "Arial", "font.size": 8, "axes.linewidth": 0.6})
-    fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.6))
+    fig, axes = plt.subplots(1, 2, figsize=(5.4, 2.5))
     style = {"none": dict(color="#6E6E6E", ls="--", marker="s", label="without auxiliary task"),
              "aux": dict(color="#0072B2", ls="-", marker="o", label="with v3.1 auxiliary task")}
-    for ax, key, ylab in [(axes[0], "mean_macro_f1", "Mean macro-F1"), (axes[1], "under_rate", "Under-estimation rate")]:
+    for ax, key, ylab in [(axes[0], "mean_macro_f1", "Mean macro-F1"), (axes[1], "under_rate", "Underestimation rate")]:
         for ver in ["none", "aux"]:
             g = data[(data.version == ver) & (data.scope == "all") & (data.seed <= 2)].groupby("n_labels")[key]
             m, s = g.mean(), g.std(ddof=1)
             ax.errorbar(m.index, m.values, yerr=s.values, capsize=2.5, lw=1.2, ms=4, **style[ver])
+        rv = [r[key] for r in ref]
+        ax.errorbar([N_TRAIN], [np.mean(rv)], yerr=[np.std(rv, ddof=1)], capsize=2.5, lw=1.0, ms=5, marker="D", mfc="white",
+                    color="#6E6E6E", ls="none", label="without auxiliary task, 25 epochs")
         ax.set_xscale("log")
         ticks = [round(N_TRAIN * f) for f in FRACS]
         ax.set_xticks(ticks)
@@ -111,13 +129,17 @@ def main():
         ax.set_ylabel(ylab)
         ax.grid(axis="y", lw=0.4, alpha=0.5)
         ax.spines[["top", "right"]].set_visible(False)
-    axes[0].legend(frameon=False, fontsize=7, loc="lower right")
+    h, lab = axes[0].get_legend_handles_labels()
+    fig.legend(h, lab, frameon=False, fontsize=7, loc="lower center", ncol=3, columnspacing=1.2, handletextpad=0.4)
     axes[0].set_title("(a)", fontsize=8, loc="left")
     axes[1].set_title("(b)", fontsize=8, loc="left")
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0.07, 1, 1])
     FIG.mkdir(parents=True, exist_ok=True)
     for ext in ("pdf", "png"):
         fig.savefig(FIG / f"fig3_label_efficiency.{ext}", dpi=300)
+    latex_fig = FIG.parent / "latex" / "figures"
+    latex_fig.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(FIG / "fig3_label_efficiency.pdf", latex_fig / "fig3_label_efficiency.pdf")
 
 
 if __name__ == "__main__":

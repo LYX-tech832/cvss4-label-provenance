@@ -1,0 +1,92 @@
+{
+ "n": 2000,
+ "model": "deepseek-v4-pro",
+ "prompt": "DTD",
+ "thinking": "disabled",
+ "thinking_style": "deepseek",
+ "reasoning_effort": null,
+ "temperature": null,
+ "base_url": "https://api.deepseek.com",
+ "usage_total": {
+  "prompt_tokens": 24380926,
+  "prompt_cache_hit_tokens": 23145728,
+  "prompt_cache_miss_tokens": 1235198,
+  "completion_tokens": 335867,
+  "reasoning_tokens": 0
+ },
+ "versions": {
+  "instructor": "1.17.0",
+  "openai": "2.36.0",
+  "langfuse": "2.60.10"
+ },
+ "fallback_rate": {
+  "AV": 0.0,
+  "AC": 0.01,
+  "AT": 0.036,
+  "PR": 0.0175,
+  "UI": 0.019,
+  "VC": 0.1245,
+  "VI": 0.0645,
+  "VA": 0.157,
+  "SC": 0.191,
+  "SI": 0.232,
+  "SA": 0.1665
+ },
+ "n_failed_requests": 0,
+ "overall": {
+  "n": 2000,
+  "mean_macro_f1": 0.5472536108288438,
+  "exact_match": 0.046,
+  "score_mae": 1.7333500000000002,
+  "band_acc": 0.389,
+  "under_rate": 0.142,
+  "hc_recall": 0.8673765730880929,
+  "spearman": 0.42237849989051396
+ },
+ "by_type": {
+  "derived": {
+   "n": 300,
+   "mean_macro_f1": 0.4404200434933026,
+   "exact_match": 0.02,
+   "score_mae": 2.801666666666667,
+   "band_acc": 0.15666666666666668,
+   "under_rate": 0.056666666666666664,
+   "hc_recall": 1.0,
+   "spearman": 0.43923066175763054,
+   "v4_specific_f1": 0.36027309153121634
+  },
+  "independent": {
+   "n": 700,
+   "mean_macro_f1": 0.5749678480223153,
+   "exact_match": 0.04857142857142857,
+   "score_mae": 1.3477142857142856,
+   "band_acc": 0.4542857142857143,
+   "under_rate": 0.13428571428571429,
+   "hc_recall": 0.8955555555555555,
+   "spearman": 0.5649789828431678,
+   "v4_specific_f1": 0.4634434080148925
+  },
+  "v4_only": {
+   "n": 500,
+   "mean_macro_f1": 0.5297215667234444,
+   "exact_match": 0.044,
+   "score_mae": 1.808,
+   "band_acc": 0.396,
+   "under_rate": 0.2,
+   "hc_recall": 0.823076923076923,
+   "spearman": 0.4555584531463412,
+   "v4_specific_f1": 0.4661466901484964
+  },
+  "other": {
+   "n": 500,
+   "mean_macro_f1": 0.5566095748409148,
+   "exact_match": 0.06,
+   "score_mae": 1.5576,
+   "band_acc": 0.43,
+   "under_rate": 0.146,
+   "hc_recall": 0.841726618705036,
+   "spearman": 0.501047517860382,
+   "v4_specific_f1": 0.45646106586236257
+  }
+ }
+}

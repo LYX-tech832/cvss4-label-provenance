@@ -83,6 +83,9 @@ def main():
     ap.add_argument("--temperature", type=float, default=None,
                     help="采样温度；不设则用接口默认值（AutoCVSS 原代码没有设置温度）。思考模式下 DeepSeek 忽略该参数")
     ap.add_argument("--run_tag", default="", help="重复运行的标记（如 rep1）：同一批 CVE（由 --seed 决定）再调用一次，结果写到单独的目录")
+    ap.add_argument("--retry_failed", action="store_true",
+                    help="续跑时把此前调用失败的请求（raw.jsonl 里 label 为 null，如连接错误、超时）当作未完成，重新调用；"
+                         "模型自己回答的 DONT_KNOW 不算失败。10-03 完整重复运行时网络不稳，加此选项避免失败请求被当成最保守标签")
     ap.add_argument("--smoke_test", action="store_true")
     args = ap.parse_args()
 
@@ -137,6 +140,8 @@ def main():
     if raw_path.exists():
         for line in raw_path.read_text(encoding="utf-8").splitlines():
             r = json.loads(line)
+            if args.retry_failed and r["label"] is None:  # 失败的请求不算完成，下面会重新调用
+                continue
             done[(r["cve_id"], r["metric"])] = r["label"]
 
     tasks = [(row.cve_id, row.description, k) for row in test.itertuples() for k in M40 if (row.cve_id, k) not in done]
@@ -184,6 +189,7 @@ def main():
                "usage_total": usage_total,
                "versions": {p: importlib.metadata.version(p) for p in ("instructor", "openai", "langfuse")},
                "fallback_rate": {k: v / len(test) for k, v in fallback.items()},
+               "n_failed_requests": sum(done.get((c, k)) is None for c in test["cve_id"] for k in M40),  # 调用失败（不含 DONT_KNOW）
                "overall": {k: v for k, v in evaluate(test, pred).items() if k in SHORT}}
     results["by_type"] = {}
     for t in ["derived", "independent", "v4_only", "other"]:

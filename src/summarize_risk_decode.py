@@ -11,7 +11,8 @@ from pathlib import Path
 import numpy as np
 
 ENC = Path(__file__).resolve().parents[1] / "results" / "encoder"
-NAME = re.compile(r"^T2_(?P<split>.+?)_deberta-v3-base_none(?P<aux>_aux)?_e5_cwinv_sqrt_s(?P<seed>\d)$")
+# 10-02 第二轮审稿 P1：LOSO 划分按各自验证集选中 λ = 1（_lam1），一并汇总
+NAME = re.compile(r"^T2_(?P<split>.+?)_deberta-v3-base_none(?P<aux>_aux)?(?P<lam>_lam1)?_e5_cwinv_sqrt_s(?P<seed>\d)$")
 KEYS = ["mean_macro_f1", "band_acc", "under_rate", "hc_recall", "score_mae", "exact_match"]
 
 
@@ -20,7 +21,7 @@ def main():
     for d in sorted(ENC.iterdir()):
         m = NAME.match(d.name)
         if m and (d / "risk_decode.json").exists():
-            groups[(m["split"], "有辅助" if m["aux"] else "无辅助")].append(json.loads((d / "risk_decode.json").read_text(encoding="utf-8")))
+            groups[(m["split"], ("有辅助 λ=1" if m["lam"] else "有辅助") if m["aux"] else "无辅助")].append(json.loads((d / "risk_decode.json").read_text(encoding="utf-8")))
     lines = ["# 风险敏感解码汇总（测试集；各种子取平均；α 只按验证集选：验证集宏 F1 比 argmax 下降不超过 0.01 时取低估率最低的 α）\n",
              "| 划分 | 版本 | 种子数 | 选定的 α | 解码 | " + " | ".join(KEYS) + " |", "|---|---|---|---|---|" + "---|" * len(KEYS)]
     for (split, ver), rs in sorted(groups.items()):
