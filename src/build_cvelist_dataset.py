@@ -3,7 +3,7 @@
 输入：cvelistV5 Releases 中的 `<日期>_all_CVEs_at_midnight.zip.zip`（外层 zip 里还套着一个 zip）。
 输出：data/processed/cve_records.parquet，每行一条 PUBLISHED 状态的 CVE，字段见 extract_record()。
 
-用法（在 F:\\lunwen2 目录下）：
+用法（在项目根目录下）：
     python src/build_cvelist_dataset.py data/raw/2026-09-25_all_CVEs_at_midnight.zip.zip
 """
 

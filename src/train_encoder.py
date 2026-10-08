@@ -300,6 +300,12 @@ def main():
                     help="伪标签对照：辅助样本（与 --aux_v31 相同的池和种子）的 v3.1 向量按规则 R 换算成 v4 伪标签，直接监督 v4 头，损失权重 λ")
     ap.add_argument("--v31_only", action="store_true",
                     help="DeBERTa 版流水线：只用辅助样本训练 v3.1 头（不用任何 v4 标签），预测时把 v3.1 向量按规则 R 换算成 v4")
+    ap.add_argument("--frac_mode", default="random", choices=["random", "earliest"],
+                    help="--train_frac 的取法：random 按种子随机抽样；earliest 取发布日期最早的那部分（第四轮审稿 M4：模拟 v4.0 刚开始采用时的标签）")
+    ap.add_argument("--save_encoder", action="store_true",
+                    help="顺序微调的第一阶段（第四轮审稿 M3）：把验证集上最佳轮次的编码器权重存为 encoder.pt（约 0.7 GB），一般与 --v31_only 同用")
+    ap.add_argument("--init_encoder", default=None,
+                    help="顺序微调的第二阶段：从 --save_encoder 存下的 encoder.pt 初始化编码器，再只用 v4 标签微调（不能与辅助任务同用）")
     ap.add_argument("--out", default=None)
     ap.add_argument("--skip_existing", action="store_true", help="结果已存在（results.json）时直接跳过，便于中断后续跑")
     ap.add_argument("--smoke_test", action="store_true")
@@ -316,6 +322,8 @@ def main():
         ap.error("--aux_v31、--aux_cwe、--pseudo_v4、--v31_only 只能选一个")
     if (args.pseudo_v4 or args.v31_only) and args.task == "T1":
         ap.error("--pseudo_v4 与 --v31_only 只用于 T2")
+    if args.init_encoder and (args.aux_v31 or args.aux_cwe or args.pseudo_v4 or args.v31_only):
+        ap.error("--init_encoder 是顺序微调的第二阶段，只用 v4 标签，不能与辅助任务同用")
     if args.smoke_test:
         args.epochs, args.batch_size, args.model = 1, 16, "smoke-bert-tiny"
 
@@ -328,7 +336,11 @@ def main():
     if args.class_weight != "none":
         suffix += f"_cw{args.class_weight}"
     if args.train_frac < 1:
-        suffix += f"_frac{args.train_frac:g}"
+        suffix += f"_frac{'early' if args.frac_mode == 'earliest' else ''}{args.train_frac:g}"
+    if args.init_encoder:
+        suffix += "_seq"
+    if args.save_encoder:  # 另起运行名，不覆盖已有的同配置结果（如表 S10 的 DeBERTa 流水线）
+        suffix += "_enc"
     if args.exclude_ids:
         if args.split != "temporal":
             ap.error("--exclude_ids 只用于时间划分")
@@ -338,7 +350,7 @@ def main():
                             f"{'_pseudo' if args.pseudo_v4 else ''}{'_v31only' if args.v31_only else ''}"
                             f"{'_desconly' if args.no_cwe_in_text else ''}{suffix}_s{args.seed}")
     out_dir = ROOT / "results" / "encoder" / run_name
-    if args.skip_existing and (out_dir / "results.json").exists():
+    if args.skip_existing and (out_dir / "results.json").exists() and (not args.save_encoder or (out_dir / "encoder.pt").exists()):
         print(f"已存在，跳过：{run_name}", flush=True)
         return
     set_seed(args.seed)
@@ -361,8 +373,11 @@ def main():
     if args.smoke_test:
         train, val, test = train.sample(400, random_state=0), val.sample(100, random_state=0), test.sample(200, random_state=0)
     if args.train_frac < 1:  # 标签效率实验：只在训练部分抽样，验证集固定（仍是最晚的 10%），辅助样本在下面照常加入
-        train = train.sample(frac=args.train_frac, random_state=args.seed)
-        print(f"只用 {args.train_frac:g} 的 v4 训练标签：{len(train):,} 条", flush=True)
+        if args.frac_mode == "earliest":  # 条数与随机抽样时相同，只是取最早发布的
+            train = train.sort_values("pub", kind="stable").head(int(round(len(train) * args.train_frac)))
+        else:
+            train = train.sample(frac=args.train_frac, random_state=args.seed)
+        print(f"只用 {args.train_frac:g} 的 v4 训练标签（{args.frac_mode}）：{len(train):,} 条", flush=True)
     if args.aux_v31 or args.aux_cwe or args.pseudo_v4 or args.v31_only:  # 各种用法都取完全相同的辅助样本（同一个池、同一个种子）
         heldout = args.split.split(":", 1)[1] if args.split.startswith("loso:") else None
         aux = aux_pool(args.split, heldout, 300 if args.smoke_test else args.aux_max, args.seed,
@@ -417,6 +432,9 @@ def main():
         # 前向计算仍在 bf16 自动混合精度下进行。
         encoder = AutoModel.from_pretrained(args.model).float()
         hidden = encoder.config.hidden_size
+    if args.init_encoder:  # 顺序微调：编码器从第一阶段（只用 v3.1 标签训练）的权重开始，分类头重新初始化
+        encoder.load_state_dict(torch.load(args.init_encoder, map_location="cpu"), strict=True)
+        print(f"编码器从 {args.init_encoder} 初始化（顺序微调第二阶段）", flush=True)
 
     with_source = args.source_mode == "feature"
     ds = {n: CVEDataset(d, tok, args.max_len, args.task, with_source, source_index) for n, d in [("train", train), ("val", val), ("test", test)]}
@@ -468,6 +486,9 @@ def main():
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
     model.load_state_dict(best_state)
+    if args.save_encoder:
+        torch.save({k: v.detach().cpu() for k, v in model.encoder.state_dict().items()}, out_dir / "encoder.pt")
+        print(f"编码器权重已保存：{out_dir / 'encoder.pt'}", flush=True)
     test_r = test.reset_index(drop=True)
     if args.v31_only:  # 流水线的 v4 头没有训练过，只保存换算后的预测
         pred = predict_pipeline(model, loaders["test"], device, amp_dtype)

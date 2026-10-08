@@ -8,7 +8,7 @@
   loso:<源>  留一来源：测试 = 该来源的全部 CVE；训练 = 其余来源（不分时间）
 输出：results/baselines_v0/summary.md、metrics.json、predictions/*.parquet
 
-用法（在 F:\\lunwen2 目录下）：python src/baselines_v0.py
+用法（在项目根目录下）：python src/baselines_v0.py
 """
 
 import json

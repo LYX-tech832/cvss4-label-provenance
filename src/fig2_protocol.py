@@ -96,8 +96,8 @@ def main():
     arrow(ax, (76, 49.6), (31.5, 45.6))  # 分型 → 划分（按类型报告）
 
     # 4 报告
-    titled_box(ax, 54, 26.5, 44, 15, "Report per label type",
-               "• headline: non-derived labels\n• derived: reported separately\n• LOSO–VulDB: reproduction of a derived source")
+    titled_box(ax, 54, 26.5, 44, 15, "Report per source and label type",
+               "• derived labels: reported separately\n• source profile: vectors, base rate, κ\n• source-macro averages; NVD reference")
     titled_box(ax, 54, 2, 44, 22.5, "Metrics and statistics",
                "• vector: mean macro-F1, v4-specific F1,\n   exact match\n• decision: CVSS-B MAE, band accuracy,\n   underestimation, High+Critical recall\n"
                "• selection on each split's validation set\n• 5 seeds; paired bootstrap within each split")

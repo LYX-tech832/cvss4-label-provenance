@@ -25,6 +25,10 @@ AUX = {"_aux_e5_cwinv_sqrt": "--aux_v31 --aux_lambda 0.5 --class_weight inv_sqrt
 NONE = {"_e5_cwinv_sqrt": "--class_weight inv_sqrt --epochs 5", "_e5": "--class_weight none --epochs 5",
         "_e10_cwinv_sqrt": "--class_weight inv_sqrt --epochs 10", "_e10": "--class_weight none --epochs 10"}
 NONE_TEMPORAL_EXTRA = {"_e25_cwinv_sqrt": "--class_weight inv_sqrt --epochs 25"}
+# 第四轮审稿 M3（10-03）：留一来源划分也加一个步数相当的候选，轮数 = 5 ×（v4 训练样本 + 6 万辅助样本）/ v4 训练样本
+NONE_LOSO_EXTRA = {"loso:VulnCheck": {"_e16_cwinv_sqrt": "--class_weight inv_sqrt --epochs 16"},
+                   "loso:GitHub_M": {"_e15_cwinv_sqrt": "--class_weight inv_sqrt --epochs 15"},
+                   "loso:VulDB": {"_e18_cwinv_sqrt": "--class_weight inv_sqrt --epochs 18"}}
 
 
 def val_f1(split, tag):
@@ -35,7 +39,7 @@ def val_f1(split, tag):
 def select():
     out = {}
     for sp in SPLITS:
-        cands = {"aux": AUX, "none": {**NONE, **(NONE_TEMPORAL_EXTRA if sp == "temporal" else {})}}
+        cands = {"aux": AUX, "none": {**NONE, **(NONE_TEMPORAL_EXTRA if sp == "temporal" else NONE_LOSO_EXTRA[sp])}}
         out[sp] = {}
         for model, c in cands.items():
             scores = {tag: val_f1(sp, tag) for tag in c}
