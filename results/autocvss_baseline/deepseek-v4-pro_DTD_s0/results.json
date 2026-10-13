@@ -1,0 +1,88 @@
+{
+ "n": 2000,
+ "model": "deepseek-v4-pro",
+ "prompt": "DTD",
+ "thinking": "disabled",
+ "reasoning_effort": null,
+ "usage_total": {
+  "prompt_tokens": 24380926,
+  "prompt_cache_hit_tokens": 20496512,
+  "prompt_cache_miss_tokens": 3884414,
+  "completion_tokens": 335825,
+  "reasoning_tokens": 0
+ },
+ "versions": {
+  "instructor": "1.17.0",
+  "openai": "2.36.0",
+  "langfuse": "2.60.10"
+ },
+ "fallback_rate": {
+  "AV": 0.0025,
+  "AC": 0.011,
+  "AT": 0.0315,
+  "PR": 0.0175,
+  "UI": 0.0145,
+  "VC": 0.1225,
+  "VI": 0.072,
+  "VA": 0.162,
+  "SC": 0.1975,
+  "SI": 0.225,
+  "SA": 0.158
+ },
+ "overall": {
+  "n": 2000,
+  "mean_macro_f1": 0.5470692237342457,
+  "exact_match": 0.0415,
+  "score_mae": 1.7266000000000001,
+  "band_acc": 0.417,
+  "under_rate": 0.134,
+  "hc_recall": 0.8702807357212003,
+  "spearman": 0.40800673704944396
+ },
+ "by_type": {
+  "derived": {
+   "n": 300,
+   "mean_macro_f1": 0.44503843737546434,
+   "exact_match": 0.016666666666666666,
+   "score_mae": 2.714,
+   "band_acc": 0.18,
+   "under_rate": 0.03,
+   "hc_recall": 1.0,
+   "spearman": 0.4456661833475791,
+   "v4_specific_f1": 0.3688741020807211
+  },
+  "independent": {
+   "n": 700,
+   "mean_macro_f1": 0.5652005552073572,
+   "exact_match": 0.03571428571428571,
+   "score_mae": 1.3581428571428573,
+   "band_acc": 0.5014285714285714,
+   "under_rate": 0.12142857142857143,
+   "hc_recall": 0.9044444444444445,
+   "spearman": 0.5688398755623166,
+   "v4_specific_f1": 0.4479358402932121
+  },
+  "v4_only": {
+   "n": 500,
+   "mean_macro_f1": 0.5360167760552159,
+   "exact_match": 0.04,
+   "score_mae": 1.7444000000000002,
+   "band_acc": 0.414,
+   "under_rate": 0.192,
+   "hc_recall": 0.8384615384615385,
+   "spearman": 0.42865149970313726,
+   "v4_specific_f1": 0.44992936417104523
+  },
+  "other": {
+   "n": 500,
+   "mean_macro_f1": 0.5562962205667256,
+   "exact_match": 0.066,
+   "score_mae": 1.6322,
+   "band_acc": 0.444,
+   "under_rate": 0.156,
+   "hc_recall": 0.8237410071942446,
+   "spearman": 0.47037554349428845,
+   "v4_specific_f1": 0.4699652091303129
+  }
+ }
+}

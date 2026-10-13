@@ -1,0 +1,89 @@
+{
+ "n": 200,
+ "model": "deepseek-v4-pro",
+ "prompt": "DTD",
+ "thinking": "disabled",
+ "reasoning_effort": null,
+ "temperature": 0.0,
+ "usage_total": {
+  "prompt_tokens": 2439263,
+  "prompt_cache_hit_tokens": 2316416,
+  "prompt_cache_miss_tokens": 122847,
+  "completion_tokens": 33453,
+  "reasoning_tokens": 0
+ },
+ "versions": {
+  "instructor": "1.17.0",
+  "openai": "2.36.0",
+  "langfuse": "2.60.10"
+ },
+ "fallback_rate": {
+  "AV": 0.0,
+  "AC": 0.01,
+  "AT": 0.025,
+  "PR": 0.01,
+  "UI": 0.02,
+  "VC": 0.09,
+  "VI": 0.07,
+  "VA": 0.14,
+  "SC": 0.21,
+  "SI": 0.185,
+  "SA": 0.09
+ },
+ "overall": {
+  "n": 200,
+  "mean_macro_f1": 0.5189777634312416,
+  "exact_match": 0.05,
+  "score_mae": 1.79,
+  "band_acc": 0.355,
+  "under_rate": 0.15,
+  "hc_recall": 0.8476190476190476,
+  "spearman": 0.32093029748858737
+ },
+ "by_type": {
+  "derived": {
+   "n": 30,
+   "mean_macro_f1": 0.3995780634609323,
+   "exact_match": 0.06666666666666667,
+   "score_mae": 2.9366666666666674,
+   "band_acc": 0.1,
+   "under_rate": 0.03333333333333333,
+   "hc_recall": 1.0,
+   "spearman": 0.44325407300990766,
+   "v4_specific_f1": 0.38425506069573867
+  },
+  "independent": {
+   "n": 70,
+   "mean_macro_f1": 0.5636877766263166,
+   "exact_match": 0.04285714285714286,
+   "score_mae": 1.204285714285714,
+   "band_acc": 0.4714285714285714,
+   "under_rate": 0.14285714285714285,
+   "hc_recall": 0.88,
+   "spearman": 0.5116762659133809,
+   "v4_specific_f1": 0.4834439664424878
+  },
+  "v4_only": {
+   "n": 50,
+   "mean_macro_f1": 0.47206871451918764,
+   "exact_match": 0.04,
+   "score_mae": 1.754,
+   "band_acc": 0.4,
+   "under_rate": 0.16,
+   "hc_recall": 0.9166666666666666,
+   "spearman": 0.40757139853957025,
+   "v4_specific_f1": 0.4261076995890661
+  },
+  "other": {
+   "n": 50,
+   "mean_macro_f1": 0.4900059263793088,
+   "exact_match": 0.06,
+   "score_mae": 1.9579999999999997,
+   "band_acc": 0.3,
+   "under_rate": 0.22,
+   "hc_recall": 0.7037037037037037,
+   "spearman": 0.26002760843058986,
+   "v4_specific_f1": 0.41034370494020533
+  }
+ }
+}

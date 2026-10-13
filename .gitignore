@@ -1,0 +1,17 @@
+# secrets — never commit
+.deepseek_key
+*.key
+.env
+
+# local environments, models and third-party code
+.venv*/
+venv*/
+models/
+external/AutoCVSS/
+
+# raw data (download from cvelistV5, see README)
+data/raw/
+
+# Python caches
+__pycache__/
+*.pyc
