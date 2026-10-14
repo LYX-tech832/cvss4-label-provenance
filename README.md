@@ -89,6 +89,7 @@ Each command rewrites a result file under `results/`. With the included predicti
 | `python src/review_checks14.py` | Gain of the auxiliary-task model over the selected baseline encoder on the R-inconsistent subset and on the test labels without a v3.1 vector from the same source, with paired bootstrap intervals (Section 7.2; Table S14) | 3 min |
 | `python src/review_checks15.py` | CVEs for which the NVD itself gives a v4.0 vector, among the 16,250 v4.0-labelled CVEs with an NVD-assigned v3.1 vector (Section 8.2) | seconds |
 | `python src/review_checks16.py` (run `review_checks10.py a` first) | Rows "TF-IDF + LR (C = 16)" of Table 2: the TF-IDF baseline with the value of C that validation data select, on all and on the non-derived labels of the temporal split (Section 6.1; Table S38) | seconds |
+| `python src/review_checks17.py` | Composition of the NVD reference subset: share of test CVEs with an NVD v3.1 vector by source and before and after 15 April 2026, severity of the CNA labels with and without one, and agreement with the NVD by period (Section 8.2; Note S9) | 1 min |
 | `python src/review_gpu4_tables.py` | Rows of Tables 2, 3 and S24 for the selected configurations | 5 min |
 | `python src/review_gpu2_summary.py` | Shuffled-v3.1-label controls with all and with 5% of the v4.0 training labels, ten-epoch baselines on the LOSO splits (Sections 7.2 and 7.3; Tables S3, S10, S14 and S23) | 30 min |
 
