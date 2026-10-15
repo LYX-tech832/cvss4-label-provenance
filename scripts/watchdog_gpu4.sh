@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# 服务器端看门狗：无人值守时守护 scripts/run_review_gpu4.sh。
-#   1. 批次进程没写"全部完成"就消失 → 自动重启（--skip_existing 跳过已完成的训练），最多重启 5 次；
-#   2. 日志 60 分钟没有任何变化（训练卡死）→ 结束当前训练进程，批次脚本会记为失败并继续下一个；
-#   3. 批次写完"全部完成"后，若本轮有失败的训练 → 再跑一遍批次补跑失败的（最多补 2 遍）；
-#   4. SHUTDOWN_WHEN_DONE=1 时，全部成功完成后关机（默认不关）。
-# 记录：watchdog_gpu4.log。启动：setsid nohup bash scripts/watchdog_gpu4.sh > /dev/null 2>&1 < /dev/null &
+# Watchdog on the server: guards scripts/run_review_gpu4.sh when unattended.
+#   1. If the batch process disappears without writing its completion line -> restart (--skip_existing skips finished runs), at most 5 restarts;
+#   2. if the log does not change for 60 minutes (training stuck) -> end the current training process; the batch script records it as
+#      failed and continues with the next run;
+#   3. after the batch has written its completion line, if any run failed -> run the batch again to redo the failed runs (at most twice);
+#   4. with SHUTDOWN_WHEN_DONE=1, shut down after everything has finished successfully (default: no shutdown).
+# Log: watchdog_gpu4.log. Start: setsid nohup bash scripts/watchdog_gpu4.sh > /dev/null 2>&1 < /dev/null &
 cd "$(dirname "$0")/.." || exit 1
 LOG=watchdog_gpu4.log
 OUT=review_gpu4.out

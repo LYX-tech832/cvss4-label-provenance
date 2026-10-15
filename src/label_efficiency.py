@@ -1,9 +1,10 @@
-"""W5 标签效率曲线（CPU）：只用 5% / 10% / 25% / 50% 的 v4 训练标签时，"无辅助"与"有 v3.1 辅助"两个版本的表现。
+"""W5 label-efficiency curves (CPU): the baseline and the v3.1 auxiliary model with only 5% / 10% / 25% / 50% of the v4 training labels.
 
-- 100% 的点取 W4 时间划分的选定配置（种子 0–4；曲线上只用种子 0–2，与其余比例的种子数一致，表里另列 5 种子的均值）；
-- 指标从 pred_latent.parquet 用 evaluate() 重算：全部测试集与去掉 derived 两种口径；
-- 每个比例做各划分内同款的配对 bootstrap（aux − none，先按种子平均，1,000 次重抽样，95% 区间）。
-输出：results/label_efficiency/summary.md、data.csv；图 3：paper/figures/fig3_label_efficiency.{pdf,png}
+- The 100% point is the configuration selected in W4 on the temporal split (seeds 0-4; the curve uses only seeds 0-2, matching the
+  number of seeds of the other fractions; the table also lists the 5-seed mean);
+- metrics are recomputed from pred_latent.parquet with evaluate(), on all test labels and without derived labels;
+- for each fraction, the same paired bootstrap as within the splits (aux − none, averaged over seeds first, 1,000 resamples, 95% interval).
+Output: results/label_efficiency/summary.md, data.csv; Figure S1: paper/figures/fig3_label_efficiency.{pdf,png}
 """
 
 import shutil
@@ -31,9 +32,9 @@ KEYS = ["mean_macro_f1", "band_acc", "under_rate", "score_mae", "exact_match"]
 
 
 def run_dirs(frac, ver):
-    """返回 {种子: 运行目录}。"""
+    """Returns {seed: run directory}."""
     stem = "T2_temporal_deberta-v3-base_none" + ("_aux_e5" if ver == "aux" else "_e*") + "_cwinv_sqrt"
-    pat = stem + (f"_frac{frac:g}_s*" if frac < 1 else "_s*")
+    pat = stem + (f"_frac{frac:g}_s[0-9]" if frac < 1 else "_s[0-9]")
     out = {}
     for d in ENC.glob(pat):
         if not (d / "pred_latent.parquet").exists():
@@ -61,29 +62,29 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     data.to_csv(OUT / "data.csv", index=False)
 
-    lines = ["# 标签效率曲线（T2 时间划分，自动生成）\n",
-             "- 5%–50%：每个比例 3 个种子（0–2），训练标签按种子随机抽样，验证集、测试集、辅助样本不变；",
-             "- 100%：W4 选定配置；表中\"100%（种子 0–2）\"与曲线一致，\"100%（种子 0–4）\"为 W4 主实验的 5 种子均值；",
-             "- 无辅助版本的训练轮数按比例放大（5% 与 10%：50 轮；25%：20 轮；50%：10 轮；100%：5 轮），有辅助版本均为 5 轮。\n"]
-    for scope, title in [("all", "全部测试集（21,900 条）"), ("non_derived", "去掉 derived（16,749 条）")]:
-        lines += [f"\n## {title}：均值 ± 标准差\n", "| v4 训练标签 | 版本 | 种子数 | " + " | ".join(KEYS) + " |", "|---|---|---|" + "---|" * len(KEYS)]
+    lines = ["# Label-efficiency curves (T2 temporal split, generated automatically)\n",
+             "- 5%–50%: 3 seeds (0–2) per fraction; the training labels are sampled at random per seed; validation set, test set and auxiliary samples unchanged; ",
+             "- 100%: configuration selected in W4; in the table, \"100% (seeds 0–2)\" matches the curve and \"100% (seeds 0–4)\" is the 5-seed mean of the W4 main runs; ",
+             "- the number of training epochs of the baseline is scaled with the fraction (5% and 10%: 50 epochs; 25%: 20 epochs; 50%: 10 epochs; 100%: 5 epochs); the auxiliary variant always uses 5 epochs.\n"]
+    for scope, title in [("all", "all test labels (21,900)"), ("non_derived", "without derived labels (16,749)")]:
+        lines += [f"\n## {title}: mean ± standard deviation\n", "| v4 training labels | Variant | Seeds | " + " | ".join(KEYS) + " |", "|---|---|---|" + "---|" * len(KEYS)]
         for frac in FRACS:
             for ver in ["none", "aux"]:
                 sets = [("", data[(data.frac == frac) & (data.version == ver) & (data.scope == scope) & (data.seed <= 2)])]
                 if frac == 1.0:
-                    sets.append(("（种子 0–4）", data[(data.frac == frac) & (data.version == ver) & (data.scope == scope)]))
+                    sets.append((" (seeds 0–4)", data[(data.frac == frac) & (data.version == ver) & (data.scope == scope)]))
                 for tag, g in sets:
                     if g.empty:
                         continue
-                    lab = f"{frac:.0%}（{round(N_TRAIN * frac):,} 条）{tag}"
-                    lines.append(f"| {lab} | {'有辅助' if ver == 'aux' else '无辅助'} | {len(g)} | "
+                    lab = f"{frac:.0%} ({round(N_TRAIN * frac):,}){tag}"
+                    lines.append(f"| {lab} | {'auxiliary' if ver == 'aux' else 'baseline'} | {len(g)} | "
                                  + " | ".join(f"{g[k].mean():.3f} ± {g[k].std(ddof=1):.3f}" for k in KEYS) + " |")
 
-    if "--plot_only" in sys.argv:  # 10-03：只重画图 3，不重算汇总表
+    if "--plot_only" in sys.argv:  # 只重画图 S1，不重算汇总表
         plot(df, data)
         return
-    lines += ["\n## 各比例的配对 bootstrap（有辅助 − 无辅助；种子 0–2 先平均；1,000 次；95% 区间）\n",
-              "| v4 训练标签 | 口径 | 平均宏 F1 差 | 等级准确率差 | 低估率差 | 分数 MAE 差 |", "|---|---|---|---|---|---|"]
+    lines += ["\n## Paired bootstrap for each fraction (auxiliary − baseline; seeds 0–2 averaged first; 1,000 resamples; 95% interval)\n",
+              "| v4 training labels | Scope | Mean macro-F1 difference | Band accuracy difference | Underestimation difference | Score MAE difference |", "|---|---|---|---|---|---|"]
     for frac in FRACS:
         none = {s: d for s, d in run_dirs(frac, "none").items() if s <= 2}
         aux = {s: d for s, d in run_dirs(frac, "aux").items() if s <= 2}
@@ -92,16 +93,16 @@ def main():
         res = paired_bootstrap(df, none, aux, B=1000)
         for scope, r in res.items():
             cells = " | ".join(f"{r[k][0]:+.3f} [{r[k][1]:+.3f}, {r[k][2]:+.3f}]" for k in ["mean_macro_f1", "band_acc", "under_rate", "score_mae"])
-            lines.append(f"| {frac:.0%} | {'全部' if scope == 'all' else '去掉 derived'} | {cells} |")
+            lines.append(f"| {frac:.0%} | {'all' if scope == 'all' else 'without derived'} | {cells} |")
     (OUT / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     plot(df, data)
 
 
 def plot(df, data):
-    """图 3：两栏（平均宏 F1、低估率），全部测试集，种子 0–2 的均值 ± 标准差。
-    10-03 修改：按正文宽度 1:1 作图；纵轴写 Underestimation；加上表 7 选中的无辅助 25 轮模型（全部标签，种子 0–2）作参照；
-    图同步到 paper/latex/figures/（LaTeX 编译实际用这一份）。"""
+    """Figure S1: two panels (mean macro-F1, underestimation rate), all test labels, mean ± standard deviation over seeds 0-2.
+    Drawn at text width 1:1; y-axis label Underestimation; the baseline selected for Table 2 (25 epochs, all labels, seeds 0-2) is added
+    as a reference; the figure is copied to paper/latex/figures/ (the copy used by the LaTeX build)."""
     ref = []
     for s in range(3):
         d = ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}"

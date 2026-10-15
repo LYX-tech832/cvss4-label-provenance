@@ -1,33 +1,33 @@
-# NVD 参照子集的构成（自动生成）
+# Composition of the NVD reference subset (generated automatically)
 
-时间划分测试集 21,900 条，其中有 NVD 自评 v3.1 向量的 6,356 条（29.0%）。
+Temporal split test set: 21,900 CVEs, of which 6,356 have an NVD-assigned v3.1 vector (29.0%).
 
-## A. 有 NVD 向量的比例
+## A. Share with an NVD vector
 
-| 来源 | 测试 CVE | 有 NVD 向量 | 4 月 15 日前 | 4 月 15 日起 |
+| Source | Test CVEs | With an NVD vector | Before 15 April | From 15 April |
 |---|---|---|---|---|
-| VulDB | 5,151 | 17.9% | 43.1%（n = 1,834） | 3.9%（n = 3,317） |
-| VulnCheck | 6,388 | 14.1% | 31.1%（n = 1,856） | 7.1%（n = 4,532） |
-| GitHub | 3,600 | 59.9% | 94.9%（n = 1,419） | 37.1%（n = 2,181） |
-| 其他来源 | 6,761 | 35.2% | 54.7%（n = 1,792） | 28.1%（n = 4,969） |
-| 合计 | 21,900 | 29.0% | 53.6%（n = 6,901） | 17.7%（n = 14,999） |
+| VulDB | 5,151 | 17.9% | 43.1% (n = 1,834) | 3.9% (n = 3,317) |
+| VulnCheck | 6,388 | 14.1% | 31.1% (n = 1,856) | 7.1% (n = 4,532) |
+| GitHub | 3,600 | 59.9% | 94.9% (n = 1,419) | 37.1% (n = 2,181) |
+| other sources | 6,761 | 35.2% | 54.7% (n = 1,792) | 28.1% (n = 4,969) |
+| total | 21,900 | 29.0% | 53.6% (n = 6,901) | 17.7% (n = 14,999) |
 
-有 NVD 向量的测试 CVE 中发布于 4 月 15 日起的占 41.9%；全测试集中占 68.5%。
+Of the test CVEs with an NVD vector, 41.9% were published from 15 April on; of the whole test set, 68.5%.
 
-## B. CNA 标签为 High 或 Critical 的比例
+## B. Share of CNA labels rated High or Critical
 
-| 来源 | 有 NVD 向量 | 无 NVD 向量 |
+| Source | With an NVD vector | Without an NVD vector |
 |---|---|---|
-| VulDB | 2.3%（n = 922） | 19.5%（n = 4,229） |
-| VulnCheck | 45.6%（n = 900） | 66.0%（n = 5,488） |
-| GitHub | 56.8%（n = 2,156） | 57.5%（n = 1,444） |
-| 其他来源 | 50.6%（n = 2,378） | 60.2%（n = 4,383） |
-| 非 derived 合计 | 52.2%（n = 5,434） | 62.7%（n = 11,315） |
+| VulDB | 2.3% (n = 922) | 19.5% (n = 4,229) |
+| VulnCheck | 45.6% (n = 900) | 66.0% (n = 5,488) |
+| GitHub | 56.8% (n = 2,156) | 57.5% (n = 1,444) |
+| other sources | 50.6% (n = 2,378) | 60.2% (n = 4,383) |
+| non-derived total | 52.2% (n = 5,434) | 62.7% (n = 11,315) |
 
-## C. CNA 的 v4.0 标签与 NVD 七项全同的比例（全部有 NVD v3.1 向量的 CVE）
+## C. Share of CNA v4.0 labels identical to the NVD on all seven shared items (all CVEs with an NVD v3.1 vector)
 
-| 时期 | VulDB | VulnCheck | GitHub | 其他来源 |
+| Period | VulDB | VulnCheck | GitHub | other sources |
 |---|---|---|---|---|
-| 2026 年以前 | 3.6%（n = 6,032） | 63.6%（n = 478） | 37.8%（n = 991） | 35.5%（n = 2,393） |
-| 2026-01-01 至 04-14 | 1.4%（n = 791） | 29.8%（n = 578） | 45.3%（n = 1,346） | 28.3%（n = 981） |
-| 2026-04-15 起 | 1.5%（n = 131） | 34.2%（n = 322） | 51.7%（n = 810） | 40.6%（n = 1,397） |
+| before 2026 | 3.6% (n = 6,032) | 63.6% (n = 478) | 37.8% (n = 991) | 35.5% (n = 2,393) |
+| 2026-01-01 to 04-14 | 1.4% (n = 791) | 29.8% (n = 578) | 45.3% (n = 1,346) | 28.3% (n = 981) |
+| from 2026-04-15 | 1.5% (n = 131) | 34.2% (n = 322) | 51.7% (n = 810) | 40.6% (n = 1,397) |

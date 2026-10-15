@@ -1,70 +1,70 @@
-# 来源可预测性、回填与按来源宏平均的 CPU 分析（自动生成）
+# Predictability by source, back-filling and source-macro averages (generated automatically)
 
-## A. 同一批 CVE 上，v3.1 标签与 v4.0 标签的可预测性（TF-IDF + LR；T1 的双版本评分 CVE）
+## A. Predictability of the v3.1 and the v4.0 labels of the same CVEs (TF-IDF + LR; the dual-scored CVEs of T1)
 
-训练：2026 年前的双版本评分 CVE 10,396 条；测试：2026 年的 13,077 条。两个模型的输入、训练 CVE、测试 CVE 完全相同，只是标签换了版本。
+Training: 10,396 dual-scored CVEs before 2026; test: 13,077 in 2026. Input, training CVEs and test CVEs are identical for both models; only the version of the labels differs.
 
-| 测试标签的来源 | n | v3.1：基率 / 等级准确率 / κ / 平均宏 F1（8 指标） | v4.0：基率 / 等级准确率 / κ / 平均宏 F1（11 指标） |
+| Source of the test labels | n | v3.1: base rate / band accuracy / κ / mean macro-F1 (8 metrics) | v4.0: base rate / band accuracy / κ / mean macro-F1 (11 metrics) |
 |---|---|---|---|
 | VulDB | 5,151 | 0.487 / 0.654 / 0.420 / 0.773 | 0.806 / 0.905 / 0.681 / 0.626 |
-| 其他来源合计 | 7,926 | 0.468 / 0.525 / 0.276 / 0.618 | 0.512 / 0.566 / 0.299 / 0.546 |
+| all other sources | 7,926 | 0.468 / 0.525 / 0.276 / 0.618 | 0.512 / 0.566 / 0.299 / 0.546 |
 | VulnCheck | 6,068 | 0.477 / 0.529 / 0.283 / 0.594 | 0.508 / 0.568 / 0.308 / 0.513 |
-| VulDB、VulnCheck 以外 | 1,858 | 0.439 / 0.511 / 0.256 / 0.613 | 0.524 / 0.560 / 0.261 / 0.556 |
+| other than VulDB and VulnCheck | 1,858 | 0.439 / 0.511 / 0.256 / 0.613 | 0.524 / 0.560 / 0.261 / 0.556 |
 
-（宏 F1 在每个指标的全部取值上平均，未出现的取值记 0，与论文口径一致。）
+(Macro-F1 is averaged over all values of each metric; values that do not occur score 0, as in the paper.)
 
-## B. 时间划分测试集（2026 年发布）的 CVE 编号年份
+## B. CVE identifier years in the temporal split test set (published in 2026)
 
-| 来源 | n | 编号年份 < 2025 | 编号年份 = 2025 | 编号年份 = 2026 |
+| Source | n | Identifier year < 2025 | Identifier year = 2025 | Identifier year = 2026 |
 |---|---|---|---|---|
 | VulnCheck | 6,388 | 27.3% | 2.2% | 70.5% |
 | VulDB | 5,151 | 0.2% | 1.9% | 97.9% |
 | GitHub_M | 3,600 | 0.2% | 3.4% | 96.4% |
-| 其他来源 | 6,761 | 1.0% | 13.0% | 86.0% |
-| 全部 | 21,900 | 8.4% | 5.7% | 86.0% |
+| other sources | 6,761 | 1.0% | 13.0% | 86.0% |
+| all | 21,900 | 8.4% | 5.7% | 86.0% |
 
-## C. 按来源宏平均（时间划分测试集；每个来源等权）
+## C. Source-macro averages (temporal split test set; equal weight per source)
 
 
-测试 CVE ≥ 30 条的来源：60 个（覆盖 20,550 / 21,900 条）
+Sources with at least 30 test CVEs: 60 (covering 20,550 / 21,900 CVEs)
 
-| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|
-| 多数类 | 0.249 | 0.373 | 0.577 |
+| majority class | 0.249 | 0.373 | 0.577 |
 | TF-IDF + LR | 0.466 | 0.507 | 0.173 |
-| DeBERTa（25 轮） | 0.488 | 0.516 | 0.208 |
-| DeBERTa + 辅助 | 0.508 | 0.540 | 0.181 |
+| DeBERTa (25 epochs) | 0.488 | 0.516 | 0.208 |
+| DeBERTa + auxiliary | 0.508 | 0.540 | 0.181 |
 
-辅助 − DeBERTa（25 轮），按来源宏平均：平均宏 F1 +0.019 [+0.015, +0.024]（来源重抽样）；辅助更好的来源 53 / 60；等级准确率 +0.024 [+0.012, +0.037]。
-辅助 − TF-IDF，按来源宏平均：平均宏 F1 +0.042；辅助更好的来源 53 / 60。
+Auxiliary − DeBERTa (25 epochs), source-macro average: mean macro-F1 +0.019 [+0.015, +0.024] (sources resampled); sources where the auxiliary model is better 53 / 60; band accuracy +0.024 [+0.012, +0.037]. 
+Auxiliary − TF-IDF, source-macro average: mean macro-F1 +0.042; sources where the auxiliary model is better 53 / 60.
 
-测试 CVE ≥ 100 条的来源：22 个（覆盖 18,563 / 21,900 条）
+Sources with at least 100 test CVEs: 22 (covering 18,563 / 21,900 CVEs)
 
-| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|
-| 多数类 | 0.255 | 0.433 | 0.487 |
+| majority class | 0.255 | 0.433 | 0.487 |
 | TF-IDF + LR | 0.480 | 0.523 | 0.135 |
-| DeBERTa（25 轮） | 0.507 | 0.526 | 0.172 |
-| DeBERTa + 辅助 | 0.530 | 0.553 | 0.153 |
+| DeBERTa (25 epochs) | 0.507 | 0.526 | 0.172 |
+| DeBERTa + auxiliary | 0.530 | 0.553 | 0.153 |
 
-辅助 − DeBERTa（25 轮），按来源宏平均：平均宏 F1 +0.023 [+0.016, +0.031]（来源重抽样）；辅助更好的来源 20 / 22；等级准确率 +0.028 [+0.007, +0.055]。
-辅助 − TF-IDF，按来源宏平均：平均宏 F1 +0.050；辅助更好的来源 21 / 22。
+Auxiliary − DeBERTa (25 epochs), source-macro average: mean macro-F1 +0.023 [+0.016, +0.031] (sources resampled); sources where the auxiliary model is better 20 / 22; band accuracy +0.028 [+0.007, +0.055]. 
+Auxiliary − TF-IDF, source-macro average: mean macro-F1 +0.050; sources where the auxiliary model is better 21 / 22.
 
-## D. T1 测试集（2026 年、双版本评分）的标签类型
+## D. Label types of the T1 test set (2026, dual-scored)
 
-independent 6,765；derived 5,151；other 1,161；合计 13,077。
-v4-only 类型的 CNA 按定义双版本评分不到 5%；它们在 2026 年的双版本评分 CVE：0 条（）。
+independent 6,765; derived 5,151; other 1,161; total 13,077.
+By definition, fewer than 5% of the CVEs of v4-only CNAs are dual-scored; their dual-scored CVEs in 2026: 0 ().
 
-## E. 去掉回填的测试 CVE（编号年份早于 2025）后的主要结果
+## E. Main results without the back-filled test CVEs (identifier year before 2025)
 
-去掉 1,829 条（其中 VulnCheck 1,747 条）。平均宏 F1 / 等级准确率：
+Removed: 1,829 (VulnCheck 1,747). Mean macro-F1 / band accuracy:
 
-| 范围 | n | TF-IDF + LR | DeBERTa（25 轮） | DeBERTa + 辅助 | 辅助 − DeBERTa（宏 F1）[95%] |
+| Scope | n | TF-IDF + LR | DeBERTa (25 epochs) | DeBERTa + auxiliary | Auxiliary − DeBERTa (macro-F1) [95%] |
 |---|---|---|---|---|---|
-| 全部测试集 | 21,900 | 0.605 / 0.598 | 0.620 / 0.604 | 0.645 / 0.623 | +0.025 [+0.023, +0.026] |
-| 全部，去掉回填 | 20,071 | 0.599 / 0.590 | 0.617 / 0.600 | 0.640 / 0.619 | +0.024 [+0.022, +0.026] |
-| 非 derived | 16,749 | 0.547 / 0.504 | 0.564 / 0.513 | 0.590 / 0.537 | +0.026 [+0.024, +0.028] |
-| 非 derived，去掉回填 | 14,928 | 0.536 / 0.483 | 0.557 / 0.496 | 0.583 / 0.521 | +0.025 [+0.023, +0.027] |
+| all test labels | 21,900 | 0.605 / 0.598 | 0.620 / 0.604 | 0.645 / 0.623 | +0.025 [+0.023, +0.026] |
+| all, without back-filled | 20,071 | 0.599 / 0.590 | 0.617 / 0.600 | 0.640 / 0.619 | +0.024 [+0.022, +0.026] |
+| non-derived | 16,749 | 0.547 / 0.504 | 0.564 / 0.513 | 0.590 / 0.537 | +0.026 [+0.024, +0.028] |
+| non-derived, without back-filled | 14,928 | 0.536 / 0.483 | 0.557 / 0.496 | 0.583 / 0.521 | +0.025 [+0.023, +0.027] |
 | VulnCheck | 6,388 | 0.535 / 0.563 | 0.551 / 0.562 | 0.577 / 0.586 | +0.025 [+0.021, +0.029] |
-| VulnCheck，去掉回填 | 4,641 | 0.512 / 0.515 | 0.541 / 0.527 | 0.565 / 0.551 | +0.024 [+0.020, +0.029] |
-| VulnCheck，只看回填 | 1,747 | 0.571 / 0.691 | 0.539 / 0.654 | 0.567 / 0.679 | +0.028 [+0.021, +0.033] |
+| VulnCheck, without back-filled | 4,641 | 0.512 / 0.515 | 0.541 / 0.527 | 0.565 / 0.551 | +0.024 [+0.020, +0.029] |
+| VulnCheck, back-filled only | 1,747 | 0.571 / 0.691 | 0.539 / 0.654 | 0.567 / 0.679 | +0.028 [+0.021, +0.033] |

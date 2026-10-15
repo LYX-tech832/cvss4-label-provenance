@@ -1,14 +1,15 @@
-"""风险敏感解码（CPU，后处理）：在准确率与"低估严重性"之间取平衡。
+"""Risk-sensitive decoding (CPU, post-processing): a balance between accuracy and underestimating severity.
 
-规则：对每个指标，候选集 = 概率 ≥ α × 最大概率的类别；在候选集中选"最严重"的类别。
-  α = 1 等价于普通的 argmax；α 越小，越倾向于往严重的方向判。
-各指标的严重程度排序（从最严重到最轻，按 CVSS v4.0 规范的含义）：
-  AV: N > A > L > P；AC: L > H；AT: N > P；PR: N > L > H；UI: N > P > A；
+Rule: for each metric, the candidate set is the classes with probability >= α × the maximum probability; the most severe class in the
+candidate set is chosen. α = 1 equals ordinary argmax; the smaller α, the more the decision leans towards severe values.
+Severity order of each metric (most to least severe, following the meaning in the CVSS v4.0 specification):
+  AV: N > A > L > P; AC: L > H; AT: N > P; PR: N > L > H; UI: N > P > A;
   VC/VI/VA/SC/SI/SA: H > L > N
-α 的选择只用验证集：在"验证集平均 F1 比 argmax 下降不超过 --max_f1_drop"的 α 中，选验证集低估率最低的那个。
-输入：results/encoder/<运行名>/probs.npz（train_encoder.py 保存）
-输出：<运行目录>/risk_decode.json，并打印 α 扫描表
-用法：python src/risk_decode.py results/encoder/<运行名> [更多运行目录...]
+α is selected on the validation set only: among the α that lower the mean validation F1 by at most --max_f1_drop relative to argmax,
+the one with the lowest validation underestimation rate.
+Input: results/encoder/<run name>/probs.npz (saved by train_encoder.py)
+Output: <run directory>/risk_decode.json; the scan over α is printed
+Usage: python src/risk_decode.py results/encoder/<run name> [more run directories...]
 """
 
 import argparse

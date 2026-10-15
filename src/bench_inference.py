@@ -1,14 +1,16 @@
-"""DeBERTa 推理测速（本机 CPU）：第 7.6 节"微调编码器可在本地运行"的依据。
+"""Inference speed of DeBERTa (local CPU): the basis of the statement that the fine-tuned encoder can run locally.
 
-- 模型结构与我们的模型相同：DeBERTa-v3-base + 11 个 v4.0 输出头（预测时不用辅助头）；
-  推理耗时只取决于结构，与权重的具体数值无关，所以输出头用随机初始化即可（训练时未保存权重）；
-- 输入与训练时相同："描述 + CWE 编号"，截断到 256 个词元；
-- 从时间划分测试集中随机抽 500 条（种子 0）；
-- 两种场景：逐条（batch = 1，前 100 条，报告中位数与 95 分位延迟）和批量（batch = 32，报告吞吐量，含分词时间）；
-- 计时前先预热。
-输入：models/deberta-v3-base（从 hf-mirror.com 下载的 config.json、pytorch_model.bin、spm.model、tokenizer_config.json）
-运行：.venv-llm/Scripts/python.exe src/bench_inference.py（该环境装有分词器需要的 sentencepiece）
-输出：results/bench_inference.json
+- Same architecture as our models: DeBERTa-v3-base + 11 v4.0 output heads (the auxiliary heads are not used for prediction);
+  inference time depends only on the architecture, not on the values of the weights, so randomly initialised output heads suffice
+  (the trained weights were not saved);
+- input as in training: "description + CWE identifier", truncated to 256 tokens;
+- 500 CVEs drawn at random from the temporal split test set (seed 0);
+- two settings: one at a time (batch = 1, the first 100, median and 95th-percentile latency) and batched (batch = 32, throughput,
+  including tokenisation);
+- warm-up before timing.
+Input: models/deberta-v3-base (config.json, pytorch_model.bin, spm.model, tokenizer_config.json downloaded from hf-mirror.com)
+Run: .venv-llm/Scripts/python.exe src/bench_inference.py (this environment has sentencepiece, which the tokenizer needs)
+Output: results/bench_inference.json
 """
 
 import json

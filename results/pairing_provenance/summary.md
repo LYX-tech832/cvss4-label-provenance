@@ -1,15 +1,15 @@
-# 配对来源分析（近似 Vieira 2026 的 D4：2023-11-01 至 2026-07-12 发布、同时有 v3.1 与 v4.0，共 25,377 条）
+# Pairing provenance (approximation of D4 of Vieira et al. 2026: published from 2023-11-01 to 2026-07-12, with both v3.1 and v4.0, 25,377 CVEs)
 
-v4.0 标签来源前 5：cna@vuldb.com 11,254（44.3%）；disclosure@vulncheck.com 4,101（16.2%）；security-advisories@github.com 3,011（11.9%）；ics-cert@hq.dhs.gov 618（2.4%）；productcert@siemens.com 547（2.2%）
+Top 5 sources of the v4.0 labels: cna@vuldb.com 11,254 (44.3%); disclosure@vulncheck.com 4,101 (16.2%); security-advisories@github.com 3,011 (11.9%); ics-cert@hq.dhs.gov 618 (2.4%); productcert@siemens.com 547 (2.2%)
 
-| 设定 | n | 其中 VulDB | 规则 R 等级准确率 | 低估率 | 整向量全对 |
+| Setting | n | Of which VulDB | Rule-R band accuracy | Underestimation | Exact vector |
 |---|---|---|---|---|---|
-| 跨来源（NVD v3.1 ↔ CNA v4.0），全部可用 | 15,488 | 44.9% | 45.8% | 4.9% | 12.9% |
-| 同来源（CNA v3.1 ↔ CNA v4.0），全部可用 | 18,218 | 61.8% | 96.2% | 0.4% | 81.1% |
-| 同来源，去掉 VulDB | 6,964 | 0.0% | 90.2% | 1.1% | 57.0% |
-| 严格配对 · 用 NVD 的 v3.1 | 8,470 | 82.1% | 30.7% | 1.1% | 5.4% |
-| 严格配对 · 用 CNA 的 v3.1 | 8,470 | 82.1% | 98.0% | 0.4% | 86.5% |
-| 严格配对去掉 VulDB · 用 NVD 的 v3.1 | 1,518 | 0.0% | 65.3% | 5.5% | 16.5% |
-| 严格配对去掉 VulDB · 用 CNA 的 v3.1 | 1,518 | 0.0% | 89.2% | 2.0% | 52.2% |
+| cross-source (NVD v3.1 ↔ CNA v4.0), all available | 15,488 | 44.9% | 45.8% | 4.9% | 12.9% |
+| same-source (CNA v3.1 ↔ CNA v4.0), all available | 18,218 | 61.8% | 96.2% | 0.4% | 81.1% |
+| same-source, without VulDB | 6,964 | 0.0% | 90.2% | 1.1% | 57.0% |
+| strict pairing · NVD's v3.1 | 8,470 | 82.1% | 30.7% | 1.1% | 5.4% |
+| strict pairing · CNA's v3.1 | 8,470 | 82.1% | 98.0% | 0.4% | 86.5% |
+| strict pairing without VulDB · NVD's v3.1 | 1,518 | 0.0% | 65.3% | 5.5% | 16.5% |
+| strict pairing without VulDB · CNA's v3.1 | 1,518 | 0.0% | 89.2% | 2.0% | 52.2% |
 
-严格配对的 8,470 条 CVE 上，NVD 与 CNA 的 v3.1 向量完全相同 7.6%；逐指标一致率：AV 98.2%，AC 96.8%，PR 77.6%，UI 97.0%，S 85.5%，C 24.9%，I 38.4%，A 35.3%
+On the 8,470 strictly paired CVEs, the NVD's and the CNA's v3.1 vectors are identical for 7.6%; per-metric agreement: AV 98.2%, AC 96.8%, PR 77.6%, UI 97.0%, S 85.5%, C 24.9%, I 38.4%, A 35.3%

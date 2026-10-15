@@ -1,11 +1,12 @@
-"""每个划分只用自己的验证集选配置（CPU，几秒）。
+"""Configuration selection on each split's own validation set (CPU, seconds).
 
-原做法：配置在时间划分的验证集上选（种子 0），再用于所有划分；时间划分的验证集含被留出 CNA 的早期标签（泄漏）。
-新做法：每个 LOSO 划分用它自己的验证集（训练部分最晚的 10%，不含被留出的 CNA）在同样的搜索空间里选；
-无辅助模型的训练轮数上限（5 / 10 / 25 轮，各自按验证集选最佳轮次）也作为超参数一起选（充分训练的基线）。
-时间划分同样按自己的验证集选（与原来一致，只是无辅助模型多了轮数上限这一维）。
-用法：python src/select_loso_config.py            → 打印选择表，写 results/review_gpu/config_selection.md
-      python src/select_loso_config.py --shell    → 每行输出 "划分|训练参数"，供 scripts/run_review_gpu4.sh 跑选中配置的 5 个种子
+Each LOSO split selects its configuration in the same search space on its own validation set (the latest 10% of its training part,
+without the held-out CNA); selecting on the temporal split's validation set would use early labels of the held-out CNA.
+For the model without the auxiliary task, the cap on training epochs (5 / 10 / 25, each with the best epoch chosen on the validation set)
+is selected as a further hyperparameter (a fully trained baseline). The temporal split also selects on its own validation set.
+Usage: python src/select_loso_config.py            -> prints the selection table and writes results/review_gpu/config_selection.md
+       python src/select_loso_config.py --shell    -> prints one line "split|training arguments" per selected configuration,
+                                                     used by scripts/run_review_gpu4.sh to run its 5 seeds
 """
 
 import json
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENC = ROOT / "results" / "encoder"
 OUT = ROOT / "results" / "review_gpu" / "config_selection.md"
 SPLITS = ["temporal", "loso:VulnCheck", "loso:GitHub_M", "loso:VulDB"]
-# 运行名后缀 → train_encoder.py 参数（与时间划分上原来的搜索空间相同：λ ∈ {0.5, 1.0} × 类别加权 ∈ {无, inv_sqrt}，5 轮）
+# 运行名后缀 → train_encoder.py 参数（与时间划分上 W4 的搜索空间相同：λ ∈ {0.5, 1.0} × 类别加权 ∈ {无, inv_sqrt}，5 轮）
 AUX = {"_aux_e5_cwinv_sqrt": "--aux_v31 --aux_lambda 0.5 --class_weight inv_sqrt --epochs 5",
        "_aux_e5": "--aux_v31 --aux_lambda 0.5 --class_weight none --epochs 5",
        "_aux_lam1_e5_cwinv_sqrt": "--aux_v31 --aux_lambda 1.0 --class_weight inv_sqrt --epochs 5",
@@ -55,13 +56,13 @@ def main():
         for sp, d in sel.items():
             for model in ["aux", "none"]:
                 if not d[model]["complete"]:
-                    sys.exit(f"{sp} {model} 的搜索还没跑完：{d[model]['scores']}")
+                    sys.exit(f"{sp} {model}: the search has not finished: {d[model]['scores']}")
                 print(f"{sp}|{d[model]['args']}")
         return
-    lines = ["# 每个划分按自己的验证集选配置（种子 0，验证集平均宏 F1；自动生成）\n"]
+    lines = ["# Configuration selected on each split's own validation set (seed 0, mean validation macro-F1; generated automatically)\n"]
     for sp, d in sel.items():
         for model in ["aux", "none"]:
-            lines += [f"\n## {sp}，{'v3.1 辅助' if model == 'aux' else '无辅助'}\n", "| 配置 | 验证集平均宏 F1 | 选中 |", "|---|---|---|"]
+            lines += [f"\n## {sp}, {'v3.1 auxiliary task' if model == 'aux' else 'baseline'}\n", "| Configuration | Mean validation macro-F1 | Selected |", "|---|---|---|"]
             for tag, s in d[model]["scores"].items():
                 lines.append(f"| `{tag}` | {'—' if s is None else f'{s:.4f}'} | {'✓' if tag == d[model]['best'] else ''} |")
     OUT.parent.mkdir(parents=True, exist_ok=True)

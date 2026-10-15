@@ -1,9 +1,11 @@
-"""大模型采样随机性的重复运行：DeepSeek-V4-Pro 在同一批 2,000 条测试 CVE 上按主运行的设置
-（AutoCVSS DTD 提示、零样本、关闭思考、接口默认采样）完整重复两遍，用来把大模型的采样随机性算进排名翻转的置信区间。
-两遍依次运行；各自写到 results/autocvss_baseline/deepseek-v4-pro_DTD_s0_fullrep{1,2}/，中断后重跑会跳过已完成的调用。
-本机网络不稳时请求会失败（连接错误、超时）；失败的请求不能当成"最保守标签"，所以每一遍都用 --retry_failed 反复补跑，
-直到没有失败的请求（最多 8 轮）。密钥由 src/run_autocvss_baseline.py 读取，本脚本不接触密钥。
-用法：.venv-llm/Scripts/python.exe scripts/run_llm_fullreps.py
+"""Repeated runs for the LLM's sampling randomness: DeepSeek-V4-Pro repeats the main run on the same 2,000 test CVEs twice in full, with
+the settings of the main run (AutoCVSS DTD prompt, zero-shot, thinking disabled, default API sampling), so that the sampling randomness
+can be included in the confidence intervals of the ranking reversal.
+The two runs are made one after the other; each writes to results/autocvss_baseline/deepseek-v4-pro_DTD_s0_fullrep{1,2}/, and a rerun
+after an interruption skips the finished requests. Requests fail when the local network is unstable (connection errors, timeouts);
+failed requests must not be treated as the most conservative label, so each run is repeated with --retry_failed until no request has
+failed (at most 8 rounds). The key is read by src/run_autocvss_baseline.py; this script does not touch it.
+Usage: .venv-llm/Scripts/python.exe scripts/run_llm_fullreps.py
 """
 
 import json

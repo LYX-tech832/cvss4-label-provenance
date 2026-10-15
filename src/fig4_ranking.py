@@ -1,10 +1,11 @@
-"""图 4：方法的排名随"用哪些标签打分"而改变（CPU，约 1 分钟）。
+"""Figure 2: the ranking of the methods changes with the labels used for scoring (CPU, about 1 minute).
 
-(a) 时间划分测试集上对 CNA 标签的等级准确率：全部标签 → 非 derived 标签。
-(b) 测试集里有 NVD 自评 v3.1 向量的 CVE：对 CNA 标签的等级准确率 → 与 NVD 等级相同的比例。
-四个方法：TF-IDF + LR、TF-IDF 流水线（规则 R，不用 v4.0 标签）、DeBERTa（25 轮）、DeBERTa + v3.1 辅助（各 5 个种子的平均）。
-数值从保存的预测重算，应与论文表 7（Band 列）和补充表 S35 一致。
-输出：paper/figures/fig4_ranking.pdf、.png、fig4_data.csv；并复制 pdf 到 paper/latex/figures。
+(a) Band accuracy against the CNA labels on the temporal split test set: all labels -> non-derived labels.
+(b) Test CVEs with an NVD-assigned v3.1 vector: band accuracy against the CNA labels -> share with the same band as the NVD.
+Four methods: TF-IDF + LR, TF-IDF pipeline (rule R, no v4.0 labels), DeBERTa (25 epochs), DeBERTa + v3.1 auxiliary task (each
+averaged over 5 seeds).
+The values are recomputed from the saved predictions and should match Table 2 (column Band) and Table S35.
+Output: paper/figures/fig4_ranking.pdf, .png, fig4_data.csv; the pdf is copied to paper/latex/figures.
 """
 
 import shutil

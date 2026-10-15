@@ -1,15 +1,16 @@
-"""W3 编码器模型：DeBERTa-v3 / ModernBERT + 11 个 v4.0 指标分类头（可选：来源感知层）。
+"""W3 encoder model: DeBERTa-v3 / ModernBERT + 11 classification heads for the v4.0 metrics (optional: source-aware layer).
 
-在 GPU 平台（如 AutoDL）上运行；本机可以用 --smoke_test 在 CPU 上跑通流程（随机初始化的小模型，不下载任何东西）。
+Runs on a GPU platform; locally, --smoke_test runs the pipeline on the CPU (a small randomly initialised model, nothing is downloaded).
 
-来源感知层（--source_mode crowd）：
-  模型先输出"去掉来源习惯后"的潜在分布 p(z|x)，再对每个来源 s、每个指标 m 乘一个可学习的转移矩阵
-  T[s,m]（行 = 潜在取值，列 = 该来源记录的取值）：p(y|x,s) = p(z|x) · T[s,m]；训练损失在 p(y|x,s) 上计算。
-  正则项 λ·mean(trace(T)) 参考 Tanno et al., CVPR 2019（doi:10.1109/cvpr.2019.01150）：
-  最小化迹，促使来源矩阵吸收系统性偏差，而分类器保持"干净"。
-  评测时：对未见来源用 p(z|x)；对训练中见过的来源，另外报告 p(z|x)·T[s] 的结果。
+Source-aware layer (--source_mode crowd):
+  the model first outputs a latent distribution p(z|x) without source habits, then multiplies it, for each source s and metric m, by a
+  learnable transition matrix T[s,m] (rows = latent values, columns = values recorded by the source): p(y|x,s) = p(z|x) · T[s,m]; the
+  training loss is computed on p(y|x,s).
+  The regulariser λ·mean(trace(T)) follows Tanno et al., CVPR 2019 (doi:10.1109/cvpr.2019.01150): minimising the trace pushes the
+  source matrices to absorb systematic biases while the classifier stays clean.
+  Evaluation: p(z|x) for unseen sources; for sources seen in training, p(z|x)·T[s] is reported as well.
 
-用法示例（在项目根目录）：
+Examples (from the project root):
   python src/train_encoder.py --task T2 --split temporal --model microsoft/deberta-v3-base --source_mode none
   python src/train_encoder.py --task T2 --split temporal --model microsoft/deberta-v3-base --source_mode crowd --trace_lambda 0.01
   python src/train_encoder.py --smoke_test

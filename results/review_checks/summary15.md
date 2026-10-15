@@ -1,99 +1,99 @@
-# 按来源等权时方法的排名（时间划分测试集，自动生成）
+# Ranking of the methods with equal weight per source (temporal split test set, generated automatically)
 
-## 0. 对照：按 CVE 合并（论文表 7 的口径）
+## 0. For comparison: pooled over CVEs (as in Table 2 of the paper)
 
-| 范围 | 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Scope | Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|---|
-| 全部（21,900） | TF-IDF + LR | 0.605 | 0.598 | 0.136 |
-| 全部（21,900） | 流水线（规则 R） | 0.565 | 0.541 | 0.127 |
-| 全部（21,900） | 流水线（SC/SI/SA = N） | 0.519 | 0.545 | 0.132 |
-| 全部（21,900） | DeBERTa（25 轮） | 0.620 | 0.604 | 0.157 |
-| 全部（21,900） | DeBERTa + 辅助 | 0.645 | 0.623 | 0.143 |
-| 非 VulDB（16,749） | TF-IDF + LR | 0.547 | 0.504 | 0.155 |
-| 非 VulDB（16,749） | 流水线（规则 R） | 0.546 | 0.539 | 0.150 |
-| 非 VulDB（16,749） | 流水线（SC/SI/SA = N） | 0.498 | 0.545 | 0.156 |
-| 非 VulDB（16,749） | DeBERTa（25 轮） | 0.564 | 0.513 | 0.184 |
-| 非 VulDB（16,749） | DeBERTa + 辅助 | 0.590 | 0.537 | 0.165 |
+| all (21,900) | TF-IDF + LR | 0.605 | 0.598 | 0.136 |
+| all (21,900) | pipeline (rule R) | 0.565 | 0.541 | 0.127 |
+| all (21,900) | pipeline (SC/SI/SA = N) | 0.519 | 0.545 | 0.132 |
+| all (21,900) | DeBERTa (25 epochs) | 0.620 | 0.604 | 0.157 |
+| all (21,900) | DeBERTa + auxiliary | 0.645 | 0.623 | 0.143 |
+| non-VulDB (16,749) | TF-IDF + LR | 0.547 | 0.504 | 0.155 |
+| non-VulDB (16,749) | pipeline (rule R) | 0.546 | 0.539 | 0.150 |
+| non-VulDB (16,749) | pipeline (SC/SI/SA = N) | 0.498 | 0.545 | 0.156 |
+| non-VulDB (16,749) | DeBERTa (25 epochs) | 0.564 | 0.513 | 0.184 |
+| non-VulDB (16,749) | DeBERTa + auxiliary | 0.590 | 0.537 | 0.165 |
 
-## 测试 CVE ≥ 30 条的来源，全部来源：60 个（20,550 条），每个来源等权
+## Sources with at least 30 test CVEs, all sources: 60 sources (20,550 CVEs), equal weight per source
 
-| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|
 | TF-IDF + LR | 0.466 | 0.507 | 0.173 |
-| 流水线（规则 R） | 0.467 | 0.533 | 0.155 |
-| 流水线（SC/SI/SA = N） | 0.445 | 0.536 | 0.162 |
-| DeBERTa（25 轮） | 0.488 | 0.516 | 0.208 |
-| DeBERTa + 辅助 | 0.508 | 0.540 | 0.181 |
+| pipeline (rule R) | 0.467 | 0.533 | 0.155 |
+| pipeline (SC/SI/SA = N) | 0.445 | 0.536 | 0.162 |
+| DeBERTa (25 epochs) | 0.488 | 0.516 | 0.208 |
+| DeBERTa + auxiliary | 0.508 | 0.540 | 0.181 |
 
-与流水线（规则 R）的差（方法 − 流水线；区间：对来源重抽样 2,000 次）
+Difference from pipeline (rule R) (method − pipeline; interval: sources resampled 2,000 times)
 
-| 方法 | 等级准确率差 | 方法更高的来源数 | 平均宏 F1 差 | 方法更高的来源数 |
+| Method | Band accuracy difference | Sources where the method is higher | Mean macro-F1 difference | Sources where the method is higher |
 |---|---|---|---|---|
 | TF-IDF + LR | -0.026 [-0.054, +0.006] | 18 / 60 | -0.001 [-0.012, +0.010] | 26 / 60 |
-| 流水线（SC/SI/SA = N） | +0.003 [-0.003, +0.009] | 20 / 60 | -0.022 [-0.028, -0.016] | 10 / 60 |
-| DeBERTa（25 轮） | -0.017 [-0.044, +0.013] | 19 / 60 | +0.022 [+0.011, +0.033] | 40 / 60 |
-| DeBERTa + 辅助 | +0.007 [-0.019, +0.032] | 29 / 60 | +0.041 [+0.031, +0.051] | 50 / 60 |
+| pipeline (SC/SI/SA = N) | +0.003 [-0.003, +0.009] | 20 / 60 | -0.022 [-0.028, -0.016] | 10 / 60 |
+| DeBERTa (25 epochs) | -0.017 [-0.044, +0.013] | 19 / 60 | +0.022 [+0.011, +0.033] | 40 / 60 |
+| DeBERTa + auxiliary | +0.007 [-0.019, +0.032] | 29 / 60 | +0.041 [+0.031, +0.051] | 50 / 60 |
 
-## 测试 CVE ≥ 30 条的来源，不含 VulDB：59 个（15,399 条），每个来源等权
+## Sources with at least 30 test CVEs, without VulDB: 59 sources (15,399 CVEs), equal weight per source
 
-| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|
 | TF-IDF + LR | 0.463 | 0.500 | 0.174 |
-| 流水线（规则 R） | 0.465 | 0.533 | 0.157 |
-| 流水线（SC/SI/SA = N） | 0.443 | 0.535 | 0.164 |
-| DeBERTa（25 轮） | 0.486 | 0.509 | 0.210 |
-| DeBERTa + 辅助 | 0.505 | 0.533 | 0.182 |
+| pipeline (rule R) | 0.465 | 0.533 | 0.157 |
+| pipeline (SC/SI/SA = N) | 0.443 | 0.535 | 0.164 |
+| DeBERTa (25 epochs) | 0.486 | 0.509 | 0.210 |
+| DeBERTa + auxiliary | 0.505 | 0.533 | 0.182 |
 
-与流水线（规则 R）的差（方法 − 流水线；区间：对来源重抽样 2,000 次）
+Difference from pipeline (rule R) (method − pipeline; interval: sources resampled 2,000 times)
 
-| 方法 | 等级准确率差 | 方法更高的来源数 | 平均宏 F1 差 | 方法更高的来源数 |
+| Method | Band accuracy difference | Sources where the method is higher | Mean macro-F1 difference | Sources where the method is higher |
 |---|---|---|---|---|
 | TF-IDF + LR | -0.033 [-0.059, -0.005] | 17 / 59 | -0.002 [-0.014, +0.009] | 25 / 59 |
-| 流水线（SC/SI/SA = N） | +0.003 [-0.003, +0.009] | 20 / 59 | -0.022 [-0.028, -0.017] | 10 / 59 |
-| DeBERTa（25 轮） | -0.024 [-0.048, +0.003] | 18 / 59 | +0.020 [+0.010, +0.031] | 39 / 59 |
-| DeBERTa + 辅助 | +0.001 [-0.021, +0.024] | 28 / 59 | +0.040 [+0.030, +0.050] | 49 / 59 |
+| pipeline (SC/SI/SA = N) | +0.003 [-0.003, +0.009] | 20 / 59 | -0.022 [-0.028, -0.017] | 10 / 59 |
+| DeBERTa (25 epochs) | -0.024 [-0.048, +0.003] | 18 / 59 | +0.020 [+0.010, +0.031] | 39 / 59 |
+| DeBERTa + auxiliary | +0.001 [-0.021, +0.024] | 28 / 59 | +0.040 [+0.030, +0.050] | 49 / 59 |
 
-## 测试 CVE ≥ 100 条的来源，全部来源：22 个（18,563 条），每个来源等权
+## Sources with at least 100 test CVEs, all sources: 22 sources (18,563 CVEs), equal weight per source
 
-| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|
 | TF-IDF + LR | 0.480 | 0.523 | 0.135 |
-| 流水线（规则 R） | 0.476 | 0.509 | 0.138 |
-| 流水线（SC/SI/SA = N） | 0.454 | 0.522 | 0.140 |
-| DeBERTa（25 轮） | 0.507 | 0.526 | 0.172 |
-| DeBERTa + 辅助 | 0.530 | 0.553 | 0.153 |
+| pipeline (rule R) | 0.476 | 0.509 | 0.138 |
+| pipeline (SC/SI/SA = N) | 0.454 | 0.522 | 0.140 |
+| DeBERTa (25 epochs) | 0.507 | 0.526 | 0.172 |
+| DeBERTa + auxiliary | 0.530 | 0.553 | 0.153 |
 
-与流水线（规则 R）的差（方法 − 流水线；区间：对来源重抽样 2,000 次）
+Difference from pipeline (rule R) (method − pipeline; interval: sources resampled 2,000 times)
 
-| 方法 | 等级准确率差 | 方法更高的来源数 | 平均宏 F1 差 | 方法更高的来源数 |
+| Method | Band accuracy difference | Sources where the method is higher | Mean macro-F1 difference | Sources where the method is higher |
 |---|---|---|---|---|
 | TF-IDF + LR | +0.013 [-0.048, +0.079] | 10 / 22 | +0.004 [-0.021, +0.029] | 10 / 22 |
-| 流水线（SC/SI/SA = N） | +0.012 [+0.003, +0.025] | 11 / 22 | -0.022 [-0.031, -0.014] | 3 / 22 |
-| DeBERTa（25 轮） | +0.016 [-0.041, +0.082] | 10 / 22 | +0.031 [+0.009, +0.053] | 15 / 22 |
-| DeBERTa + 辅助 | +0.044 [-0.004, +0.095] | 13 / 22 | +0.054 [+0.036, +0.071] | 20 / 22 |
+| pipeline (SC/SI/SA = N) | +0.012 [+0.003, +0.025] | 11 / 22 | -0.022 [-0.031, -0.014] | 3 / 22 |
+| DeBERTa (25 epochs) | +0.016 [-0.041, +0.082] | 10 / 22 | +0.031 [+0.009, +0.053] | 15 / 22 |
+| DeBERTa + auxiliary | +0.044 [-0.004, +0.095] | 13 / 22 | +0.054 [+0.036, +0.071] | 20 / 22 |
 
-## 测试 CVE ≥ 100 条的来源，不含 VulDB：21 个（13,412 条），每个来源等权
+## Sources with at least 100 test CVEs, without VulDB: 21 sources (13,412 CVEs), equal weight per source
 
-| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |
+| Method | Mean macro-F1 | Band accuracy | Underestimation |
 |---|---|---|---|
 | TF-IDF + LR | 0.474 | 0.505 | 0.138 |
-| 流水线（规则 R） | 0.473 | 0.508 | 0.142 |
-| 流水线（SC/SI/SA = N） | 0.450 | 0.521 | 0.144 |
-| DeBERTa（25 轮） | 0.501 | 0.508 | 0.177 |
-| DeBERTa + 辅助 | 0.525 | 0.537 | 0.157 |
+| pipeline (rule R) | 0.473 | 0.508 | 0.142 |
+| pipeline (SC/SI/SA = N) | 0.450 | 0.521 | 0.144 |
+| DeBERTa (25 epochs) | 0.501 | 0.508 | 0.177 |
+| DeBERTa + auxiliary | 0.525 | 0.537 | 0.157 |
 
-与流水线（规则 R）的差（方法 − 流水线；区间：对来源重抽样 2,000 次）
+Difference from pipeline (rule R) (method − pipeline; interval: sources resampled 2,000 times)
 
-| 方法 | 等级准确率差 | 方法更高的来源数 | 平均宏 F1 差 | 方法更高的来源数 |
+| Method | Band accuracy difference | Sources where the method is higher | Mean macro-F1 difference | Sources where the method is higher |
 |---|---|---|---|---|
 | TF-IDF + LR | -0.003 [-0.060, +0.056] | 9 / 21 | +0.000 [-0.024, +0.024] | 9 / 21 |
-| 流水线（SC/SI/SA = N） | +0.013 [+0.003, +0.027] | 11 / 21 | -0.023 [-0.033, -0.015] | 3 / 21 |
-| DeBERTa（25 轮） | +0.000 [-0.054, +0.058] | 9 / 21 | +0.028 [+0.006, +0.049] | 14 / 21 |
-| DeBERTa + 辅助 | +0.029 [-0.013, +0.072] | 12 / 21 | +0.051 [+0.033, +0.070] | 19 / 21 |
+| pipeline (SC/SI/SA = N) | +0.013 [+0.003, +0.027] | 11 / 21 | -0.023 [-0.033, -0.015] | 3 / 21 |
+| DeBERTa (25 epochs) | +0.000 [-0.054, +0.058] | 9 / 21 | +0.028 [+0.006, +0.049] | 14 / 21 |
+| DeBERTa + auxiliary | +0.029 [-0.013, +0.072] | 12 / 21 | +0.051 [+0.033, +0.070] | 19 / 21 |
 
-### 各来源的等级准确率（≥ 100 条）：TF-IDF + LR / 流水线（规则 R）/ DeBERTa + 辅助
+### Band accuracy of each source (at least 100 CVEs): TF-IDF + LR / pipeline (rule R) / DeBERTa + auxiliary
 
-| 来源 | n | TF-IDF + LR | 流水线（规则 R） | DeBERTa + 辅助 |
+| Source | n | TF-IDF + LR | pipeline (rule R) | DeBERTa + auxiliary |
 |---|---|---|---|---|
 | VulnCheck | 6,388 | 0.563 | 0.592 | 0.586 |
 | VulDB | 5,151 | 0.904 | 0.546 | 0.903 |

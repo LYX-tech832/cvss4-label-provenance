@@ -1,4 +1,4 @@
-"""表 S7 的 TF-IDF 重拟合与表 7 差 ≤0.004 的原因。分别按原顺序和按发布日期排序重拟合，与存档预测比较（CPU，约 15 分钟）。"""
+"""Cause of the difference (at most 0.004) between the TF-IDF refits of Table S7 and Table 2: refits in the original order and sorted by publication date, compared with the archived predictions (CPU, about 15 minutes)."""
 import sys
 from pathlib import Path
 import numpy as np, pandas as pd

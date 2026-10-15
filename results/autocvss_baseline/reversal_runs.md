@@ -1,40 +1,40 @@
-# 排名翻转与大模型的采样随机性（同一批 2,000 条测试 CVE，DeepSeek-V4-Pro 三遍运行；自动生成）
+# Ranking reversal and the LLM's sampling randomness (the same 2,000 test CVEs, three runs of DeepSeek-V4-Pro; generated automatically)
 
 
-## 样本整体（n = 2,000）：DeepSeek − TF-IDF
+## whole sample (n = 2,000): DeepSeek − TF-IDF
 
-| 运行 | 平均宏 F1 差 | 等级准确率差 |
+| Run | Mean macro-F1 difference | Band accuracy difference |
 |---|---|---|
-| 主运行（9-26） | -0.031 | -0.137 |
-| 完整重复 1（10-03） | -0.037 | -0.155 |
-| 完整重复 2（10-03） | -0.031 | -0.165 |
-| 三遍的标准差 | 0.0030 | 0.0142 |
+| main run (26 Sep) | -0.031 | -0.137 |
+| full repetition 1 (3 Oct) | -0.037 | -0.155 |
+| full repetition 2 (3 Oct) | -0.031 | -0.165 |
+| Standard deviation over the three runs | 0.0030 | 0.0142 |
 
-| 估计 | 平均宏 F1 差 | 等级准确率差 |
+| Estimate | Mean macro-F1 difference | Band accuracy difference |
 |---|---|---|
-| 只用主运行，CVE 重抽样（论文原来的做法） | -0.031 [-0.047, -0.016] | -0.137 [-0.164, -0.111] |
-| 三遍平均，CVE 重抽样 | -0.033 [-0.047, -0.020] | -0.152 [-0.177, -0.127] |
-| 三遍平均，CVE 与运行两层重抽样 | -0.033 [-0.047, -0.018] | -0.152 [-0.181, -0.122] |
+| Main run only, CVEs resampled | -0.031 [-0.047, -0.016] | -0.137 [-0.164, -0.111] |
+| Mean of the three runs, CVEs resampled | -0.033 [-0.047, -0.020] | -0.152 [-0.177, -0.127] |
+| Mean of the three runs, CVEs and runs resampled (two levels) | -0.033 [-0.047, -0.018] | -0.152 [-0.181, -0.122] |
 
-## 去掉 derived（n = 1,700）：DeepSeek − TF-IDF
+## without derived labels (n = 1,700): DeepSeek − TF-IDF
 
-| 运行 | 平均宏 F1 差 | 等级准确率差 |
+| Run | Mean macro-F1 difference | Band accuracy difference |
 |---|---|---|
-| 主运行（9-26） | +0.021 | -0.037 |
-| 完整重复 1（10-03） | +0.018 | -0.053 |
-| 完整重复 2（10-03） | +0.023 | -0.066 |
-| 三遍的标准差 | 0.0026 | 0.0144 |
+| main run (26 Sep) | +0.021 | -0.037 |
+| full repetition 1 (3 Oct) | +0.018 | -0.053 |
+| full repetition 2 (3 Oct) | +0.023 | -0.066 |
+| Standard deviation over the three runs | 0.0026 | 0.0144 |
 
-| 估计 | 平均宏 F1 差 | 等级准确率差 |
+| Estimate | Mean macro-F1 difference | Band accuracy difference |
 |---|---|---|
-| 只用主运行，CVE 重抽样（论文原来的做法） | +0.021 [+0.006, +0.037] | -0.037 [-0.068, -0.007] |
-| 三遍平均，CVE 重抽样 | +0.021 [+0.007, +0.036] | -0.052 [-0.078, -0.025] |
-| 三遍平均，CVE 与运行两层重抽样 | +0.021 [+0.005, +0.036] | -0.052 [-0.081, -0.021] |
+| Main run only, CVEs resampled | +0.021 [+0.006, +0.037] | -0.037 [-0.068, -0.007] |
+| Mean of the three runs, CVEs resampled | +0.021 [+0.007, +0.036] | -0.052 [-0.078, -0.025] |
+| Mean of the three runs, CVEs and runs resampled (two levels) | +0.021 [+0.005, +0.036] | -0.052 [-0.081, -0.021] |
 
-## 各遍之间的一致率（全部 2,000 条）
+## Agreement between runs (all 2,000 CVEs)
 
-| 运行对 | 严重性等级相同 | 完整向量相同 |
+| Pair of runs | Same severity band | Same complete vector |
 |---|---|---|
-| 主运行（9-26） / 完整重复 1（10-03） | 65.9% | 19.1% |
-| 主运行（9-26） / 完整重复 2（10-03） | 64.8% | 18.8% |
-| 完整重复 1（10-03） / 完整重复 2（10-03） | 64.3% | 18.2% |
+| main run (26 Sep) / full repetition 1 (3 Oct) | 65.9% | 19.1% |
+| main run (26 Sep) / full repetition 2 (3 Oct) | 64.8% | 18.8% |
+| full repetition 1 (3 Oct) / full repetition 2 (3 Oct) | 64.3% | 18.2% |

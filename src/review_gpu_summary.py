@@ -1,10 +1,14 @@
-"""汇总补充 GPU 实验（CPU，几分钟）：scripts/run_review_gpu.sh 的三项，T2 时间划分，种子 0–2。
+"""Summary of the additional GPU runs (CPU, a few minutes): the three experiments of scripts/run_review_gpu.sh, T2 temporal split, seeds 0-2.
 
-1. 训练轮数：无辅助 / v3.1 辅助训练 10 轮与 5 轮（W4 主实验的同样种子）对比；10 轮时辅助任务的增益；最佳轮次。
-2. 伪标签对照（pseudo）：与 v3.1 辅助用同一批 60,000 条辅助样本，只是换成规则 R 换算的 v4 伪标签直接监督 v4 头。
-3. DeBERTa 版流水线（v31only）：只用这批样本训练 v3.1 头，再按规则 R 换算；与 TF-IDF 版流水线、v3.1 辅助模型对比。
-差值为配对 bootstrap（测试 CVE 重抽样 1,000 次，每次对各版本的种子取平均），口径：全部测试集、去掉 derived。
-输出：results/review_gpu/summary.md
+1. Training epochs: baseline / v3.1 auxiliary task trained for 10 epochs vs 5 epochs (the same seeds as the W4 main runs); gain of the
+   auxiliary task at 10 epochs; best epoch.
+2. Pseudo-label control (pseudo): the same 60,000 auxiliary samples as the v3.1 auxiliary task, but with v4 pseudo-labels converted with
+   rule R that supervise the v4 heads directly.
+3. DeBERTa pipeline (v31only): trains only the v3.1 heads on these samples and converts with rule R; compared with the TF-IDF pipeline
+   and the v3.1 auxiliary model.
+Differences: paired bootstrap (test CVEs resampled 1,000 times, each variant averaged over its seeds), on all test labels and without
+derived labels.
+Output: results/review_gpu/summary.md
 """
 
 import json
@@ -24,9 +28,9 @@ OUT = ROOT / "results" / "review_gpu"
 SEEDS = [0, 1, 2]
 STEM = "T2_temporal_deberta-v3-base_none"
 VERSIONS = {
-    "无辅助（5 轮）": "_e5_cwinv_sqrt", "v3.1 辅助（5 轮）": "_aux_e5_cwinv_sqrt",
-    "无辅助（10 轮）": "_e10_cwinv_sqrt", "v3.1 辅助（10 轮）": "_aux_e10_cwinv_sqrt",
-    "伪标签（5 轮）": "_pseudo_e5_cwinv_sqrt", "DeBERTa 流水线（5 轮）": "_v31only_e5",
+    "baseline (5 epochs)": "_e5_cwinv_sqrt", "v3.1 auxiliary (5 epochs)": "_aux_e5_cwinv_sqrt",
+    "baseline (10 epochs)": "_e10_cwinv_sqrt", "v3.1 auxiliary (10 epochs)": "_aux_e10_cwinv_sqrt",
+    "pseudo-labels (5 epochs)": "_pseudo_e5_cwinv_sqrt", "DeBERTa pipeline (5 epochs)": "_v31only_e5",
 }
 KEYS = ["mean_macro_f1", "exact_match", "score_mae", "band_acc", "under_rate", "hc_recall"]
 
@@ -49,12 +53,12 @@ def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
     runs = {v: dirs(tag) for v, tag in VERSIONS.items()}
-    lines = ["# 补充 GPU 实验：十轮训练、伪标签与流水线（T2 时间划分，种子 0–2；自动生成）\n",
-             "已完成的运行：" + "；".join(f"{v} {len(r)}/3" for v, r in runs.items()) + "\n"]
+    lines = ["# Additional GPU runs: ten-epoch training, pseudo-labels and pipeline (T2 temporal split, seeds 0–2; generated automatically)\n",
+             "Completed runs: " + "; ".join(f"{v} {len(r)}/3" for v, r in runs.items()) + "\n"]
     have = {v: r for v, r in runs.items() if r}
 
-    for scope, name in [("all", "全部测试集（21,900）"), ("non_derived", "去掉 derived（16,749）")]:
-        lines += [f"\n## 各版本均值 ± 标准差：{name}\n", "| 版本 | 种子数 | " + " | ".join(KEYS) + " | 最佳轮次 |", "|---|---|" + "---|" * (len(KEYS) + 1)]
+    for scope, name in [("all", "all test labels (21,900)"), ("non_derived", "without derived labels (16,749)")]:
+        lines += [f"\n## Mean ± standard deviation of each variant: {name}\n", "| Variant | Seeds | " + " | ".join(KEYS) + " | Best epoch |", "|---|---|" + "---|" * (len(KEYS) + 1)]
         for v, r in have.items():
             ms = [metrics(d, df)[scope] for d in r.values()]
             best = [json.loads((d / "results.json").read_text(encoding="utf-8"))["best_epoch"] + 1 for d in r.values()]
@@ -62,28 +66,28 @@ def main():
             lines.append(f"| {v} | {len(ms)} | " + " | ".join(f"{np.mean([m[k] for m in ms]):.3f} ± {np.std([m[k] for m in ms], ddof=1) if len(ms) > 1 else 0:.3f}" for k in KEYS)
                          + f" | {', '.join(map(str, best))} / {n_ep} |")
 
-    pairs = [("v3.1 辅助（10 轮）", "无辅助（10 轮）"), ("v3.1 辅助（5 轮）", "无辅助（5 轮）"),
-             ("无辅助（10 轮）", "无辅助（5 轮）"), ("v3.1 辅助（10 轮）", "v3.1 辅助（5 轮）"),
-             ("伪标签（5 轮）", "无辅助（5 轮）"), ("v3.1 辅助（5 轮）", "伪标签（5 轮）"),
-             ("DeBERTa 流水线（5 轮）", "无辅助（5 轮）"), ("v3.1 辅助（5 轮）", "DeBERTa 流水线（5 轮）")]
-    lines += ["\n## 配对 bootstrap：A − B（种子 0–2 各自平均；95% 区间）\n",
-              "| A − B | 口径 | 平均宏 F1 差 | 等级准确率差 | 低估率差 | 分数 MAE 差 |", "|---|---|---|---|---|---|"]
+    pairs = [("v3.1 auxiliary (10 epochs)", "baseline (10 epochs)"), ("v3.1 auxiliary (5 epochs)", "baseline (5 epochs)"),
+             ("baseline (10 epochs)", "baseline (5 epochs)"), ("v3.1 auxiliary (10 epochs)", "v3.1 auxiliary (5 epochs)"),
+             ("pseudo-labels (5 epochs)", "baseline (5 epochs)"), ("v3.1 auxiliary (5 epochs)", "pseudo-labels (5 epochs)"),
+             ("DeBERTa pipeline (5 epochs)", "baseline (5 epochs)"), ("v3.1 auxiliary (5 epochs)", "DeBERTa pipeline (5 epochs)")]
+    lines += ["\n## Paired bootstrap: A − B (each averaged over seeds 0–2; 95% interval)\n",
+              "| A − B | Scope | Mean macro-F1 difference | Band accuracy difference | Underestimation difference | Score MAE difference |", "|---|---|---|---|---|---|"]
     for a, b in pairs:
         if a in have and b in have:
             res = paired_bootstrap(df, have[b], have[a])
             for scope in ["all", "non_derived"]:
                 r = res[scope]
-                lines.append(f"| {a} − {b} | {'全部' if scope == 'all' else '去掉 derived'} | " +
+                lines.append(f"| {a} − {b} | {'all' if scope == 'all' else 'without derived'} | " +
                              " | ".join(f"{r[k][0]:+.3f} [{r[k][1]:+.3f}, {r[k][2]:+.3f}]" for k in BOOT_KEYS) + " |")
 
-    lines += ["\n## 逐指标宏 F1（全部测试集 / 去掉 derived；种子平均）\n", "| 版本 | " + " | ".join(M40) + " |", "|---|" + "---|" * len(M40)]
+    lines += ["\n## Per-metric macro-F1 (all test labels / without derived; mean over seeds)\n", "| Variant | " + " | ".join(M40) + " |", "|---|" + "---|" * len(M40)]
     for v, r in have.items():
         pm = [per_metric(d, df, None) for d in r.values()]
         lines.append(f"| {v} | " + " | ".join(f"{np.mean([x['all'][k] for x in pm]):.3f} / {np.mean([x['non_derived'][k] for x in pm]):.3f}" for k in M40) + " |")
 
     pl = json.loads((ROOT / "results" / "pipeline_baseline" / "metrics.json").read_text(encoding="utf-8"))["temporal"]["rule_R"]
-    lines += ["\n## 参照：TF-IDF 版流水线（规则 R；results/pipeline_baseline）\n",
-              "| 口径 | 平均宏 F1 | 全对 | MAE | 等级准确率 | 低估率 | H+C 召回 |", "|---|---|---|---|---|---|---|"]
+    lines += ["\n## Reference: TF-IDF pipeline (rule R; results/pipeline_baseline)\n",
+              "| Scope | Mean macro-F1 | Exact | MAE | Band accuracy | Underestimation | H+C recall |", "|---|---|---|---|---|---|---|"]
     for scope in ["all", "non_derived"]:
         x = pl[scope]
         lines.append(f"| {scope} | {x['mean_macro_f1']:.3f} | {x['exact_match']:.3f} | {x['score_mae']:.3f} | {x['band_acc']:.3f} | {x['under_rate']:.3f} | {x['hc_recall']:.3f} |")

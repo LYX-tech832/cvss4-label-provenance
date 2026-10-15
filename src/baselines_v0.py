@@ -1,14 +1,14 @@
-"""W2 基线 v0（纯 CPU）：多数类、规则换算、条件映射、TF-IDF + 逻辑回归。
+"""Baselines v0 (CPU only): majority class, rule-based conversion, conditional mapping, TF-IDF + logistic regression.
 
-任务：预测 CNA 给出的 CVSS v4.0 基础向量（11 个指标）。
-  T1 版本迁移：输入 = 描述 + 同一 CNA 给出的 v3.1 向量（只用同时有两版的 CVE）
-  T2 从零评分：输入 = 描述（所有有 v4.0 的 CVE）
-划分：
-  temporal  训练 = 2026-01-01 之前发布；测试 = 2026-01-01 及之后
-  loso:<源>  留一来源：测试 = 该来源的全部 CVE；训练 = 其余来源（不分时间）
-输出：results/baselines_v0/summary.md、metrics.json、predictions/*.parquet
+Task: predict the CVSS v4.0 base vector given by the CNA (11 metrics).
+  T1 version migration: input = description + the v3.1 vector given by the same CNA (only CVEs with both versions)
+  T2 scoring from scratch: input = description (all CVEs with a v4.0 vector)
+Splits:
+  temporal      training = published before 2026-01-01; test = published on or after 2026-01-01
+  loso:<source> leave one source out: test = all CVEs of that source; training = the other sources (no time restriction)
+Output: results/baselines_v0/summary.md, metrics.json, predictions/*.parquet
 
-用法（在项目根目录下）：python src/baselines_v0.py
+Usage (from the project root): python src/baselines_v0.py
 """
 
 import json
@@ -61,7 +61,7 @@ SEVERITY_ORDER = {"None": 0, "Low": 1, "Medium": 2, "High": 3, "Critical": 4}
 
 
 def v4_score(vec):
-    """返回 (分数, 严重性等级)；等级取 FIRST 定性划分（None/Low/Medium/High/Critical），由 cvss 库给出。"""
+    """Returns (score, severity band); the band follows FIRST's qualitative ranges (None/Low/Medium/High/Critical) as given by the cvss library."""
     if vec not in _score_cache:
         try:
             c = CVSS4(vec)
@@ -76,9 +76,9 @@ def to_vector(row):
 
 
 def evaluate(true_df, pred_df):
-    """逐指标 Accuracy / Macro-F1；整向量完全匹配；v4.0 分数 MAE（官方公式，经 cvss 库计算）；
-    以及"下游决策"指标：严重性等级准确率、低估率（预测等级低于真实等级）、
-    High+Critical 召回率（真实为高危及以上、预测也为高危及以上的比例）、分数的 Spearman 秩相关。"""
+    """Per-metric accuracy / macro-F1; exact match of the whole vector; MAE of the v4.0 score (official formula, computed with the cvss library);
+    and decision-oriented metrics: severity band accuracy, underestimation rate (predicted band below the true band),
+    High+Critical recall (share of true High or Critical labels predicted as High or Critical), Spearman rank correlation of the scores."""
     res = {"n": len(true_df), "per_metric": {}}
     for k in M40:
         t, p = true_df["y_" + k].values, pred_df[k].values
@@ -117,7 +117,7 @@ def pred_rule(train, test):
 
 
 def pred_cond_map(train, test):
-    """从训练集学"整个 v3.1 向量 → 各 v4 指标的众数"；没见过的 v3.1 向量回退到单指标对应关系，再回退到多数类。"""
+    """Learns "whole v3.1 vector -> mode of each v4 metric" on the training set; unseen v3.1 vectors fall back to per-metric correspondences, then to the majority class."""
     key = lambda d: d[["x31_" + k for k in M31]].astype(str).agg("/".join, axis=1)  # noqa: E731
     corr = {"AV": "AV", "AC": "AC", "PR": "PR", "UI": "UI", "VC": "C", "VI": "I", "VA": "A", "SC": "S", "SI": "S", "SA": "S", "AT": "AC"}
     tr_key, te_key = key(train), key(test)
@@ -156,7 +156,7 @@ def splits(df):
 
 
 def source_type_map():
-    """来源分型（label_provenance.py 用 2026 年之前的数据得出）；没有该文件时返回空表。"""
+    """Source typing (from label_provenance.py, on data before 2026); an empty table if the file does not exist."""
     p = ROOT / "results" / "label_provenance" / "source_types.json"
     return {s: v["type"] for s, v in json.loads(p.read_text(encoding="utf-8")).items()} if p.exists() else {}
 
@@ -208,22 +208,22 @@ def main():
 
 
 def write_summary(results):
-    lines = ["# 基线 v0 结果（CPU，自动生成）\n",
-             "指标：meanF1 = 11 个 v4 指标 Macro-F1 的平均；exact = 11 个指标全对的比例；MAE = v4.0 分数平均绝对误差；",
-             "band = 严重性等级准确率；under = 低估率（预测等级 < 真实等级）；HC-rec = 真实为 High/Critical 时预测也为 High/Critical 的比例；ρ = 分数 Spearman 秩相关\n"]
+    lines = ["# Baselines v0 (CPU, generated automatically)\n",
+             "Metrics: meanF1 = mean macro-F1 over the 11 v4 metrics; exact = share with all 11 metrics correct; MAE = mean absolute error of the v4.0 score; ",
+             "band = severity band accuracy; under = underestimation rate (predicted band < true band); HC-rec = share of true High/Critical labels predicted as High/Critical; ρ = Spearman rank correlation of the scores\n"]
     for key, methods in results.items():
         task, split = key.split("|")
         any_r = next(iter(methods.values()))
-        lines.append(f"\n## {task} · {split}（训练 {any_r['n_train']:,} / 测试 {any_r['n']:,}）\n")
-        lines.append("| 方法 | meanF1 | exact | MAE | band | under | HC-rec | ρ | " + " | ".join(f"F1-{k}" for k in M40) + " |")
+        lines.append(f"\n## {task} · {split} (training {any_r['n_train']:,} / test {any_r['n']:,})\n")
+        lines.append("| Method | meanF1 | exact | MAE | band | under | HC-rec | ρ | " + " | ".join(f"F1-{k}" for k in M40) + " |")
         lines.append("|---" * (8 + len(M40)) + "|")
         for name, r in methods.items():
             pm = r["per_metric"]
             lines.append(f"| {name} | {r['mean_macro_f1']:.3f} | {r['exact_match']:.3f} | {r['score_mae']:.2f} | {r['band_acc']:.3f} | "
                          f"{r['under_rate']:.3f} | {r['hc_recall']:.3f} | {r['spearman']:.3f} | " + " | ".join(f"{pm[k]['macro_f1']:.2f}" for k in M40) + " |")
-        lines.append("\n按标签类型拆分（meanF1 / v4 特有指标 F1 / 等级准确率 / 低估率）：")
+        lines.append("\nBy label type (meanF1 / F1 of the v4-specific metrics / band accuracy / underestimation rate):")
         for name, r in methods.items():
-            lines.append(f"- {name}：" + "；".join(f"{t}(n={v['n']:,}) {v['mean_macro_f1']:.3f}/{v['v4_specific_f1']:.3f}/{v['band_acc']:.3f}/{v['under_rate']:.3f}"
+            lines.append(f"- {name}: " + "; ".join(f"{t}(n={v['n']:,}) {v['mean_macro_f1']:.3f}/{v['v4_specific_f1']:.3f}/{v['band_acc']:.3f}/{v['under_rate']:.3f}"
                                                    for t, v in r["by_type"].items()))
     (OUT_DIR / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 

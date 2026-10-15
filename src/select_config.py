@@ -1,6 +1,6 @@
-"""根据 W4 调参结果（只看验证集的最佳平均 F1），为"无辅助 / 有辅助"两个版本各选一个配置。
-读取 results/encoder/T2_temporal_deberta-v3-base_none*_e5*_s0/results.json 中的 val_best_mean_f1。
-输出：给 run_w4_seeds.sh 用的参数（NONE_ARGS / AUX_ARGS），并写入 results/encoder/selected_config.json
+"""Selects one configuration each for the baseline and the auxiliary variant from the W4 tuning results (best mean validation F1 only).
+Reads val_best_mean_f1 from results/encoder/T2_temporal_deberta-v3-base_none*_e5*_s0/results.json.
+Output: the arguments for run_w4_seeds.sh (NONE_ARGS / AUX_ARGS), also written to results/encoder/selected_config.json
 """
 
 import json

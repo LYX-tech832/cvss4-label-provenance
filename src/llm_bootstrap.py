@@ -1,13 +1,16 @@
-"""大模型对比的配对 bootstrap 区间（CPU）：第 7.1 节表 9 与第 8.2 节"结论效度"用。
+"""Paired bootstrap intervals for the LLM comparison (CPU): used for Table 4 (Section 7.5) and the discussion of conclusion validity in Section 8.2.
 
-样本：compare_llm_baseline.py 用的同一批 2,000 条测试 CVE（按标签类型分层抽样：derived 300、independent 700、v4_only 500、other 500）。
-方法：AutoCVSS + DeepSeek-V4-Pro（主运行：接口默认温度，DONT_KNOW → 最保守，即 AutoCVSS 原做法）、AutoCVSS + Qwen3-8B、
-      TF-IDF+LR（描述 + CWE）、TF-IDF+LR（只用描述，与 LLM 输入相同）、DeBERTa 与 DeBERTa + v3.1 辅助（W4 选定配置，5 个种子）。
-重抽样：在每个标签类型内有放回重抽样（各类型条数不变，与分层抽样的设计一致），默认 1,000 次；所有方法用同一批重抽样的 CVE（配对）；
-        多种子的方法在每次重抽样中先按种子平均。区间为 95% 百分位区间。
-口径：样本整体、去掉 derived、四个标签类型。指标与 evaluate() 同一口径（aggregate_seeds.fast_scores）。
-注意：样本按类型分层，"样本整体"与"去掉 derived"两行不代表测试集的真实分布。
-输出：results/autocvss_baseline/deepseek-v4-pro_DTD_s0/compare_bootstrap.md
+Sample: the same 2,000 test CVEs as in compare_llm_baseline.py (stratified by label type: derived 300, independent 700, v4_only 500,
+other 500).
+Methods: AutoCVSS + DeepSeek-V4-Pro (main run: default API temperature, DONT_KNOW -> most conservative, as in AutoCVSS),
+AutoCVSS + Qwen3-8B, TF-IDF+LR (description + CWE), TF-IDF+LR (description only, the same input as the LLM), DeBERTa and
+DeBERTa + v3.1 auxiliary task (configuration selected in W4, 5 seeds).
+Resampling: with replacement within each label type (the count of each type unchanged, matching the stratified design), 1,000 times by
+default; all methods use the same resampled CVEs (paired); methods with several seeds are averaged over seeds in each resample.
+Intervals are 95% percentile intervals.
+Scopes: whole sample, without derived, and the four label types. Metrics as in evaluate() (aggregate_seeds.fast_scores).
+The sample is stratified by type, so the "whole sample" and "without derived" rows do not represent the distribution of the test set.
+Output: results/autocvss_baseline/deepseek-v4-pro_DTD_s0/compare_bootstrap.md
 """
 
 import argparse
@@ -26,21 +29,21 @@ ENC = ROOT / "results" / "encoder"
 LLM = ROOT / "results" / "autocvss_baseline"
 MAIN = LLM / "deepseek-v4-pro_DTD_s0"
 TYPES = ["derived", "independent", "v4_only", "other"]
-SCOPES = {"样本整体": TYPES, "去掉 derived": TYPES[1:], **{t: [t] for t in TYPES}}
+SCOPES = {"whole sample": TYPES, "without derived": TYPES[1:], **{t: [t] for t in TYPES}}
 METHODS = {"DeepSeek": [MAIN / "predictions.parquet"],
            "Qwen3-8B": [LLM / "Qwen3-8B_DTD_s0" / "predictions.parquet"],
            "TF-IDF": [ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_tfidf_lr.parquet"],
-           "TF-IDF（只用描述）": [ROOT / "results" / "ablation_desc_only" / "T2_temporal_tfidf_lr_desc_only.parquet"],
+           "TF-IDF (description only)": [ROOT / "results" / "ablation_desc_only" / "T2_temporal_tfidf_lr_desc_only.parquet"],
            "DeBERTa": sorted(ENC.glob("T2_temporal_deberta-v3-base_none_e5_cwinv_sqrt_s[0-9]/pred_latent.parquet")),
-           "DeBERTa+辅助": sorted(ENC.glob("T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s[0-9]/pred_latent.parquet"))}
-CONTRASTS = [("DeepSeek", "TF-IDF"), ("DeepSeek", "TF-IDF（只用描述）"), ("DeBERTa+辅助", "DeepSeek"),
-             ("DeBERTa+辅助", "TF-IDF"), ("DeepSeek", "Qwen3-8B")]
-NAMES = {"mean_macro_f1": "平均宏 F1", "band_acc": "等级准确率", "under_rate": "低估率", "score_mae": "分数 MAE"}
+           "DeBERTa+auxiliary": sorted(ENC.glob("T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s[0-9]/pred_latent.parquet"))}
+CONTRASTS = [("DeepSeek", "TF-IDF"), ("DeepSeek", "TF-IDF (description only)"), ("DeBERTa+auxiliary", "DeepSeek"),
+             ("DeBERTa+auxiliary", "TF-IDF"), ("DeepSeek", "Qwen3-8B")]
+NAMES = {"mean_macro_f1": "Mean macro-F1", "band_acc": "Band accuracy", "under_rate": "Underestimation", "score_mae": "Score MAE"}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--boot", type=int, default=1000, help="重抽样次数")
+    ap.add_argument("--boot", type=int, default=1000, help="number of resamples")
     args = ap.parse_args()
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
@@ -53,18 +56,18 @@ def main():
     rng = np.random.default_rng(0)
 
     def score_all(idx):
-        """每个方法在这批 CVE 上的指标（多种子时先按种子平均）。"""
+        """Metrics of each method on these CVEs (averaged over seeds first when there are several)."""
         out = {}
         for name, ps in enc.items():
             rs = [fast_scores(t, p, idx) for p in ps]
             out[name] = {k: float(np.mean([r[k] for r in rs])) for k in BOOT_KEYS}
         return out
 
-    lines = [f"# 大模型对比的配对 bootstrap（同一批 {len(ids):,} 条测试 CVE；类型内重抽样 {args.boot:,} 次；95% 百分位区间；自动生成）\n",
-             "方法的种子数：" + "、".join(f"{n} {len(ps)}" for n, ps in enc.items()) + "。"
-             "样本按类型分层，\"样本整体\"与\"去掉 derived\"不代表测试集的真实分布。\n"]
-    tab_m = ["\n## 各方法的点估计与 95% 区间\n", "| 口径 | 方法 | " + " | ".join(NAMES[k] for k in BOOT_KEYS) + " |", "|---|---|" + "---|" * len(BOOT_KEYS)]
-    tab_c = ["\n## 两两差值（A − B）与 95% 区间\n", "| 口径 | A − B | " + " | ".join(NAMES[k] + "差" for k in BOOT_KEYS) + " |", "|---|---|" + "---|" * len(BOOT_KEYS)]
+    lines = [f"# Paired bootstrap for the LLM comparison (the same {len(ids):,} test CVEs; {args.boot:,} resamples within label types; 95% percentile intervals; generated automatically)\n",
+             "Seeds per method: " + ", ".join(f"{n} {len(ps)}" for n, ps in enc.items()) + ". "
+             "The sample is stratified by label type, so \"whole sample\" and \"without derived\" do not represent the distribution of the test set.\n"]
+    tab_m = ["\n## Point estimates and 95% intervals of each method\n", "| Scope | Method | " + " | ".join(NAMES[k] for k in BOOT_KEYS) + " |", "|---|---|" + "---|" * len(BOOT_KEYS)]
+    tab_c = ["\n## Pairwise differences (A − B) and 95% intervals\n", "| Scope | A − B | " + " | ".join(NAMES[k] + " difference" for k in BOOT_KEYS) + " |", "|---|---|" + "---|" * len(BOOT_KEYS)]
     for scope, types in SCOPES.items():
         strata = [np.flatnonzero(lt == ty) for ty in types]
         n = sum(len(s) for s in strata)
@@ -72,13 +75,13 @@ def main():
         boots = [score_all(np.concatenate([rng.choice(s, size=len(s), replace=True) for s in strata])) for _ in range(args.boot)]
         for name in enc:
             ci = {k: np.percentile([b[name][k] for b in boots], [2.5, 97.5]) for k in BOOT_KEYS}
-            tab_m.append(f"| {scope}（n={n:,}） | {name} | " + " | ".join(
+            tab_m.append(f"| {scope} (n={n:,}) | {name} | " + " | ".join(
                 f"{point[name][k]:.3f} [{ci[k][0]:.3f}, {ci[k][1]:.3f}]" for k in BOOT_KEYS) + " |")
         for a, b in CONTRASTS:
             ci = {k: np.percentile([bb[a][k] - bb[b][k] for bb in boots], [2.5, 97.5]) for k in BOOT_KEYS}
-            tab_c.append(f"| {scope}（n={n:,}） | {a} − {b} | " + " | ".join(
+            tab_c.append(f"| {scope} (n={n:,}) | {a} − {b} | " + " | ".join(
                 f"{point[a][k] - point[b][k]:+.3f} [{ci[k][0]:+.3f}, {ci[k][1]:+.3f}]" for k in BOOT_KEYS) + " |")
-    lines += tab_c + ["\n区间不含 0 即表示在该口径上差异稳定。低估率和 MAE 越小越好。"] + tab_m
+    lines += tab_c + ["\nAn interval that excludes 0 indicates a stable difference in that scope. Lower underestimation rate and MAE are better."] + tab_m
     out = MAIN / "compare_bootstrap.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))

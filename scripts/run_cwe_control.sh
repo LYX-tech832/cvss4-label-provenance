@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# CWE 辅助任务对照实验（T2 时间划分）：检验 v3.1 辅助任务的增益是否只因为多看了约 6 万条 CVE 描述、多了一个监督信号。
-# 三组，输入都只用描述（--no_cwe_in_text。CWE 编号若在输入里，预测 CWE 类别就等于照抄输入，对照失去意义）：
-#   ① 无辅助；② CWE 辅助（前 50 个 CWE + 其他，λ=0.5）；③ v3.1 辅助（λ=0.5）。
-# ②③ 用完全相同的辅助样本（同一个池、同一个种子）；配置沿用 W4 选定的（5 轮、inv_sqrt 类别加权），各 3 个种子。
-# 按种子轮流跑三组，中途停止时已完成的种子三组齐全。支持中断后续跑（--skip_existing）。
-# 汇总：python src/cwe_control.py（CPU）
+# CWE auxiliary-task control (T2 temporal split): is the gain of the v3.1 auxiliary task only due to seeing about 60,000 more CVE
+# descriptions and one more supervision signal?
+# Three groups, all with the description only as input (--no_cwe_in_text; if the CWE identifier were in the input, predicting the CWE
+# class would amount to copying the input, and the control would be meaningless):
+#   (1) no auxiliary task; (2) CWE auxiliary task (top 50 CWEs + other, λ=0.5); (3) v3.1 auxiliary task (λ=0.5).
+# (2) and (3) use exactly the same auxiliary samples (same pool, same seed); configuration as selected in W4 (5 epochs, inv_sqrt class
+# weighting), 3 seeds each.
+# The three groups are run seed by seed, so that all three are complete for every finished seed if the batch stops early.
+# Resumable after an interruption (--skip_existing).
+# Summary: python src/cwe_control.py (CPU)
 set -o pipefail
 cd "$(dirname "$0")/.."
 MODEL=${MODEL:-microsoft/deberta-v3-base}

@@ -1,13 +1,15 @@
-"""W2 预实验：跨版本迁移（贡献 3 的可行性检验，CPU，T2 只用描述）。
+"""W2 pilot: cross-version transfer (feasibility check, CPU, T2 with the description only).
 
-问题：约 15 万条只有 v3.1 标签的 CVE，能否帮助"从描述预测 v4.0"，尤其是在非 derived 标签和 v4 特有指标上？
-做法（两阶段堆叠，是编码器多任务学习的廉价代理）：
-  阶段 1：只用"有 v3.1、没有 v4.0、且 2026-01-01 之前发布"的 CVE，训练 描述 → 8 个 v3.1 指标的 TF-IDF+LR；
-          v4 训练/测试样本都不在阶段 1 的训练集里，所以它们得到的 v3.1 预测都是样本外的。
-  阶段 2：v4 分类器的特征 = TF-IDF(描述) + 阶段 1 预测的 v3.1 概率（乘以权重 w 后拼接）。
-对照：T2 基线 TF-IDF+LR（不含 v3.1 预测特征）。
-划分：时间划分；报告全部、去掉 derived、按标签类型三种口径。
-v3.1 标签取 CNA 的第一个 v3.1 向量，没有时取 ADP 的第一个 v3.1 向量。
+Question: can about 150,000 CVEs with only v3.1 labels help to predict v4.0 from the description, especially on the non-derived labels
+and the v4-specific metrics?
+Method (two-stage stacking, a cheap proxy for multi-task learning in an encoder):
+  Stage 1: TF-IDF+LR from the description to the 8 v3.1 metrics, trained only on CVEs with v3.1, without v4.0, published before
+           2026-01-01; no v4 training or test sample is in the training set of stage 1, so all their v3.1 predictions are out of sample.
+  Stage 2: features of the v4 classifier = TF-IDF(description) + the v3.1 probabilities predicted by stage 1 (multiplied by a weight w
+           and concatenated).
+Reference: the T2 baseline TF-IDF+LR (without the predicted v3.1 features).
+Split: temporal; reported on all labels, without derived labels, and by label type.
+The v3.1 label is the CNA's first v3.1 vector, or else the first v3.1 vector of an ADP.
 """
 
 import json

@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# 配置选择、步数相当的基线和时间信息敏感性的 GPU 实验：
-#   A. 配置搜索（种子 0）：每个 LOSO 划分在自己的验证集上重新搜索（辅助：λ ∈ {0.5, 1.0} × 类别加权 ∈ {无, inv_sqrt}；
-#      无辅助：类别加权 × 轮数上限 ∈ {5, 10}）；时间划分补无辅助的 10 轮无加权与 25 轮（与辅助模型 5 轮的优化步数相当）。
-#   B. 时间划分无辅助 25 轮补种子 1–2（与辅助模型比较步数相同的基线），10 轮补种子 3–4（主表用 5 个种子）。
-#   C. 时间划分去掉截止日期后更新过的 CVE（--exclude_ids），无辅助 10 轮与辅助 5 轮，种子 0–2。
-#   D. 按 src/select_loso_config.py 的选择结果，每个划分选中的配置跑满种子 0–4（已有的自动跳过）。
-# 支持中断后续跑（--skip_existing）。汇总：python src/select_loso_config.py；python src/review_gpu4_summary.py（CPU）
+# GPU runs for configuration selection, step-matched baselines and timing sensitivity:
+#   A. Configuration search (seed 0): each LOSO split searches again on its own validation set (auxiliary: λ in {0.5, 1.0} × class
+#      weighting in {none, inv_sqrt}; baseline: class weighting × epoch cap in {5, 10}); on the temporal split, the baseline is added
+#      with 10 epochs unweighted and 25 epochs (as many optimisation steps as the auxiliary model's 5 epochs).
+#   B. Temporal split: seeds 1-2 for the baseline with 25 epochs (the step-matched baseline for the auxiliary model), seeds 3-4 for
+#      10 epochs (the main table uses 5 seeds).
+#   C. Temporal split without the CVEs updated after the cut-off (--exclude_ids): baseline 10 epochs and auxiliary 5 epochs, seeds 0-2.
+#   D. Seeds 0-4 for the configuration selected on each split by src/select_loso_config.py (existing runs are skipped).
+# Resumable after an interruption (--skip_existing). Summary: python src/select_loso_config.py; python src/review_gpu4_summary.py (CPU)
 set -o pipefail
 cd "$(dirname "$0")/.."
 source /usr/local/miniconda3/bin/activate py312 2>/dev/null || true

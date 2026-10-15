@@ -10,7 +10,7 @@ An archived copy of this repository is available on Zenodo: <https://doi.org/10.
 
 | Path | What it is |
 |---|---|
-| `src/` | All analysis, training and evaluation code (Python). Comments are mostly in Chinese. |
+| `src/` | All analysis, training and evaluation code (Python). The description at the top of each script (here and in `scripts/`) and all result files are in English; inline comments, and the console messages of some scripts, are in Chinese. |
 | `scripts/` | Shell scripts used to run the GPU experiments on a rented Linux server. Paths such as `/root/...` refer to that server and need to be adapted. |
 | `data/processed/cve_records.parquet` | One row per published CVE record of the CVE List snapshot of 25 September 2026 (see `NOTICE.md`). |
 | `data/cve_ids_v4.csv` | The 37,997 CVEs with a CNA-provided CVSS v4.0 vector: CNA, publication date, label type, dual-scored flag, membership in the 2,000-CVE LLM sample. |
@@ -41,7 +41,7 @@ python src/build_cvelist_dataset.py path/to/2026-09-25_all_CVEs_at_midnight.zip.
 
 ## Reproducing the numbers in the paper (CPU)
 
-Each command rewrites a result file under `results/`. With the included predictions, the commands available on 29 September 2026 reproduced the published files byte for byte when we checked on that day. Tables and figures are numbered as in the manuscript; Tables S1–S42, Figures S1–S2 and Notes S1–S9 are in its supplementary material.
+Each command rewrites a result file under `results/`. With the included predictions, the commands reproduced the published files exactly, apart from line endings, when we last ran them, on 15 October 2026 (`risk_decode_baselines.py` with `--summary`, which rebuilds its tables from the stored results of each split). Tables and figures are numbered as in the manuscript; Tables S1–S42, Figures S1–S2 and Notes S1–S9 are in its supplementary material.
 
 | Command | Paper | Time |
 |---|---|---|

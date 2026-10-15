@@ -1,7 +1,7 @@
-"""CVSS v3.1 / v4.0 向量解析工具。
+"""Parsing of CVSS v3.1 / v4.0 vectors.
 
-只保留基础指标（Base metrics）；向量里若带有威胁/环境/补充指标（如 E:P、CR:H），一律忽略。
-取值定义见 FIRST 规范：
+Only the base metrics are kept; threat, environmental and supplemental metrics in a vector (e.g. E:P, CR:H) are ignored.
+Values as defined in FIRST's specifications:
   v3.1  https://www.first.org/cvss/v3.1/specification-document
   v4.0  https://www.first.org/cvss/v4.0/specification-document
 """

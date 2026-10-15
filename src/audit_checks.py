@@ -1,14 +1,18 @@
-"""补充对照：对核心结论逐条找最简单的替代解释，这里补算此前没做的对照（CPU，约 20 分钟）。
+"""Further controls: simple alternative explanations of the main findings (CPU, about 20 minutes).
 
-A. "VulDB 的标签更容易预测"会不会只是因为它的训练标签最多？——每个来源只用 1,000 条自己的 2026 年前的 v4.0 标签训练
-   TF-IDF + LR（随机抽 5 次），在该来源 2026 年的标签上测试；VulDB 另外用同样 1,000 条的 v3.1 标签再做一遍。
-B. 排名随标签来源改变是否只有"大模型对 TF-IDF、宏 F1"这一个例子？——时间划分完整测试集上，直接预测 v4.0 的模型与
-   不用任何 v4.0 标签的流水线（预测 v3.1 再按规则 R 换算）在"全部"与"非 derived"上的配对差值（对测试 CVE 重抽样 1,000 次）。
-   流水线的逐条预测此前没有保存，这里重算并存到 results/pipeline_baseline/predictions/。
-C. "换算做法随时间变化"（VulnCheck 的规则一致率上升）会不会是回填旧漏洞造成的构成变化？——VulnCheck 各季度的规则一致率，
-   按 CVE 编号年份是否比发布年份早两年以上分开。
-D. 2,000 条大模型样本上所有方法两两比较：合并与非 derived 的差值符号是否相反（类型内重抽样 1,000 次）。
-输出：results/review_checks/summary12.md
+A. Are VulDB's labels easier to predict only because it has the most training labels? Each source trains TF-IDF + LR on only 1,000 of
+   its own v4.0 labels from before 2026 (5 random draws) and is tested on its own labels of 2026; for VulDB, the same 1,000 CVEs are
+   also used with their v3.1 labels.
+B. Is the change of ranking with the label source limited to one case (LLM vs TF-IDF, macro-F1)? On the complete temporal split test
+   set, paired differences between the models that predict v4.0 directly and the pipelines that use no v4.0 labels (predict v3.1, then
+   convert with rule R), on all and on non-derived labels (test CVEs resampled 1,000 times). The per-CVE predictions of the pipelines
+   are recomputed here and saved to results/pipeline_baseline/predictions/.
+C. Is the change of conversion practice over time (VulnCheck's rising agreement with the rule) a change of composition caused by
+   back-filling old vulnerabilities? VulnCheck's quarterly agreement with rule R, separately for CVE identifiers at least two years
+   older than the publication year.
+D. All pairwise comparisons of the methods on the 2,000-CVE LLM sample: do the pooled and the non-derived differences have opposite
+   signs (resampling within label types, 1,000 times)?
+Output: results/review_checks/summary12.md
 """
 
 import sys
@@ -38,8 +42,8 @@ KEYS = ("mean_macro_f1", "band_acc", "under_rate")
 
 
 def part_a(df, lines):
-    lines += ["## A. 各来源只用自己的 1,000 条标签训练（TF-IDF + LR；5 次随机抽样的平均），在该来源 2026 年的标签上测试\n",
-              "| 来源 | 2026 年前的 v4.0 标签 | 测试标签 | 标签 | 基率 | 等级准确率 | κ | 平均宏 F1 |", "|---|---|---|---|---|---|---|---|"]
+    lines += ["## A. Each source trained on only 1,000 of its own labels (TF-IDF + LR; mean of 5 random draws), tested on its own labels of 2026\n",
+              "| Source | v4.0 labels before 2026 | Test labels | Labels | Base rate | Band accuracy | κ | Mean macro-F1 |", "|---|---|---|---|---|---|---|---|"]
     for src in ["VulDB", "VulnCheck", "GitHub_M"]:
         d = df[df["source"] == src]
         tr_all, te = d[d["pub"] < CUTOFF], d[d["pub"] >= CUTOFF].reset_index(drop=True)
@@ -65,7 +69,7 @@ def part_a(df, lines):
                 kaps.append(cohen_kappa_score(tb, pb))
             base = np.bincount(tb[tb >= 0]).max() / len(tb)
             lines.append(f"| {src} | {len(tr_all):,} | {len(te):,} | {ver} | {base:.3f} | {np.mean(accs):.3f} | {np.mean(kaps):.3f} | {np.mean(f1s):.3f} |")
-    lines.append("\n（VulDB 的 v3.1 一行：同样的 1,000 条 CVE，标签换成它自己的 v3.1 向量，宏 F1 在 8 个 v3.1 指标上平均。）")
+    lines.append("\n(VulDB's v3.1 row: the same 1,000 CVEs, with their own v3.1 vectors as labels; macro-F1 averaged over the 8 v3.1 metrics.)")
 
 
 def part_b(df, lines):
@@ -81,21 +85,21 @@ def part_b(df, lines):
 
     def enc(path):
         return Encoded(pd.read_parquet(path).set_index("cve_id").loc[ids].reset_index())
-    es = {"TF-IDF": [enc(PRED / "T2_temporal_tfidf_lr.parquet")], "流水线（规则 R）": [enc(f_r)], "流水线（SC/SI/SA=N）": [enc(f_n)],
+    es = {"TF-IDF": [enc(PRED / "T2_temporal_tfidf_lr.parquet")], "pipeline (rule R)": [enc(f_r)], "pipeline (SC/SI/SA=N)": [enc(f_n)],
           "DeBERTa": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
-          "DeBERTa+辅助": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
+          "DeBERTa+auxiliary": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
     nd = (test["label_type"] != "derived").to_numpy()
 
     def sc(name, ix):
         rs = [fast_scores(t, e, ix) for e in es[name]]
         return np.array([np.mean([r[k] for r in rs]) for k in KEYS])
-    lines += ["\n## B. 完整测试集上，直接预测 v4.0 的模型 − 不用 v4.0 标签的流水线（配对 bootstrap，1,000 次）\n",
-              "流水线点估计（核对用，应与表 7 一致）：" + "；".join(
-                  f"{n} 全部 {sc(n, np.arange(len(test)))[0]:.3f} / {sc(n, np.arange(len(test)))[1]:.3f}，非 derived {sc(n, np.flatnonzero(nd))[0]:.3f} / {sc(n, np.flatnonzero(nd))[1]:.3f}"
-                  for n in ["流水线（规则 R）", "流水线（SC/SI/SA=N）"]) + "（平均宏 F1 / 等级准确率）。\n",
-              "| A − B | 范围 | 平均宏 F1 | 等级准确率 | 低估率 |", "|---|---|---|---|---|"]
-    for a, b in [("TF-IDF", "流水线（规则 R）"), ("DeBERTa", "流水线（规则 R）"), ("DeBERTa+辅助", "流水线（规则 R）"), ("DeBERTa+辅助", "流水线（SC/SI/SA=N）")]:
-        for name, idx in [("全部", np.arange(len(test))), ("非 derived", np.flatnonzero(nd))]:
+    lines += ["\n## B. Complete test set: models that predict v4.0 directly − pipelines without v4.0 labels (paired bootstrap, 1,000 resamples)\n",
+              "Point estimates of the pipelines (for checking, should match Table 2): " + "; ".join(
+                  f"{n} all {sc(n, np.arange(len(test)))[0]:.3f} / {sc(n, np.arange(len(test)))[1]:.3f}, non-derived {sc(n, np.flatnonzero(nd))[0]:.3f} / {sc(n, np.flatnonzero(nd))[1]:.3f}"
+                  for n in ["pipeline (rule R)", "pipeline (SC/SI/SA=N)"]) + " (mean macro-F1 / band accuracy).\n",
+              "| A − B | Scope | Mean macro-F1 | Band accuracy | Underestimation |", "|---|---|---|---|---|"]
+    for a, b in [("TF-IDF", "pipeline (rule R)"), ("DeBERTa", "pipeline (rule R)"), ("DeBERTa+auxiliary", "pipeline (rule R)"), ("DeBERTa+auxiliary", "pipeline (SC/SI/SA=N)")]:
+        for name, idx in [("all", np.arange(len(test))), ("non-derived", np.flatnonzero(nd))]:
             d = sc(a, idx) - sc(b, idx)
             bs = np.array([sc(a, ix) - sc(b, ix) for ix in (rng.choice(idx, size=len(idx), replace=True) for _ in range(1000))])
             lines.append(f"| {a} − {b} | {name} | " + " | ".join(f"{d[j]:+.3f} [{np.percentile(bs[:, j], 2.5):+.3f}, {np.percentile(bs[:, j], 97.5):+.3f}]" for j in range(3)) + " |")
@@ -107,8 +111,8 @@ def part_c(df, lines):
     d["agree"] = [all(c[k] == r["y_" + k] for k in M40) for c, (_, r) in zip(conv, d.iterrows())]
     d["q"] = d["pub"].dt.tz_localize(None).dt.to_period("Q").astype(str)
     d["old"] = d["cve_id"].str.extract(r"CVE-(\d{4})-")[0].astype(int) <= d["pub"].dt.year - 2
-    lines += ["\n## C. VulnCheck 各季度的规则 R 一致率：新漏洞与回填的旧漏洞（编号年份比发布年份早两年以上）分开\n",
-              "| 季度 | 全部：n / 一致率 | 新漏洞：n / 一致率 | 回填：n / 一致率 |", "|---|---|---|---|"]
+    lines += ["\n## C. VulnCheck's quarterly agreement with rule R: new vulnerabilities and back-filled old ones (identifier year at least two years before the publication year) separately\n",
+              "| Quarter | All: n / agreement | New: n / agreement | Back-filled: n / agreement |", "|---|---|---|---|"]
     for q, g in d.groupby("q"):
         if len(g) < 30:
             continue
@@ -125,10 +129,10 @@ def part_d(df, lines):
     def enc(path):
         return Encoded(pd.read_parquet(path).set_index("cve_id").loc[ids].reset_index())
     es = {"DeepSeek": [enc(main)], "Qwen3-8B": [enc(LLM / "Qwen3-8B_DTD_s0" / "predictions.parquet")],
-          "多数类": [enc(PRED / "T2_temporal_majority.parquet")], "TF-IDF": [enc(PRED / "T2_temporal_tfidf_lr.parquet")],
-          "流水线（规则 R）": [enc(PIPE / "T2_temporal_pipeline_rule_R.parquet")],
+          "majority class": [enc(PRED / "T2_temporal_majority.parquet")], "TF-IDF": [enc(PRED / "T2_temporal_tfidf_lr.parquet")],
+          "pipeline (rule R)": [enc(PIPE / "T2_temporal_pipeline_rule_R.parquet")],
           "DeBERTa": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
-          "DeBERTa+辅助": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
+          "DeBERTa+auxiliary": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
     lt = truth["label_type"].to_numpy()
     types = ["derived", "independent", "v4_only", "other"]
     strata = {ty: np.flatnonzero(lt == ty) for ty in types}
@@ -141,11 +145,11 @@ def part_d(df, lines):
     for _ in range(1000):
         res = {ty: rng.choice(ix, size=len(ix), replace=True) for ty, ix in strata.items()}  # 两个口径用同一次重抽样
         boots.append({s: sc(np.concatenate([res[ty] for ty in tys])) for s, tys in scopes.items()})
-    lines += ["\n## D. 2,000 条样本上所有方法两两比较：合并与非 derived 的差值符号是否相反\n",
-              "| A − B | 指标 | 合并 [95%] | 非 derived [95%] | 符号相反 | 两个区间都不含 0 |", "|---|---|---|---|---|---|"]
+    lines += ["\n## D. All pairwise comparisons on the 2,000-CVE sample: opposite signs of the pooled and the non-derived differences\n",
+              "| A − B | Metric | Pooled [95%] | Non-derived [95%] | Opposite signs | Neither interval contains 0 |", "|---|---|---|---|---|---|"]
     n_pairs = n_flip = n_sig = 0
     for a, b in combinations(es, 2):
-        for j, key in enumerate(["平均宏 F1", "等级准确率"]):
+        for j, key in enumerate(["mean macro-F1", "band accuracy"]):
             n_pairs += 1
             vals = {}
             for s in scopes:
@@ -157,14 +161,14 @@ def part_d(df, lines):
             n_flip += flip
             n_sig += sig
             if flip:
-                lines.append(f"| {a} − {b} | {key} | " + " | ".join(f"{vals[s][0]:+.3f} [{vals[s][1][0]:+.3f}, {vals[s][1][1]:+.3f}]" for s in scopes) + f" | 是 | {'是' if sig else '否'} |")
-    lines.append(f"\n共 {n_pairs} 个（方法对 × 指标）；符号相反的 {n_flip} 个，其中两个区间都不含 0 的 {n_sig} 个。只列出符号相反的。")
+                lines.append(f"| {a} − {b} | {key} | " + " | ".join(f"{vals[s][0]:+.3f} [{vals[s][1][0]:+.3f}, {vals[s][1][1]:+.3f}]" for s in scopes) + f" | yes | {'yes' if sig else 'no'} |")
+    lines.append(f"\n{n_pairs} (method pair × metric) in total; {n_flip} with opposite signs, of which {n_sig} with neither interval containing 0. Only those with opposite signs are listed.")
 
 
 def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
-    lines = ["# 补充对照（自动生成）\n"]
+    lines = ["# Further controls (generated automatically)\n"]
     for step in (part_a, part_b, part_c, part_d):
         step(df, lines)
         OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -1,12 +1,16 @@
-"""对 TF-IDF 基线和流水线（规则 R）也做风险敏感解码（CPU），让各方法在同样的解码下比较。
+"""Risk-sensitive decoding for the TF-IDF baseline and the pipeline (rule R) as well (CPU), so that all methods are compared under
+the same decoding.
 
-与 risk_decode.py 相同的规则和 α 选择：候选集 = 概率 ≥ α × 最大概率的类别，取其中最严重的；
-在验证集平均宏 F1 比 argmax 下降不超过 0.01 的 α 中，选验证集低估率最低的。
-- TF-IDF：用训练部分的前 90%（按发布日期）训练一个模型，在最后 10%（验证集，与 DeBERTa 相同）上选 α；
-  测试集的概率来自用全部训练部分训练的模型（与论文表中 argmax 的 TF-IDF 结果一致，α = 1 可复现）。
-- 流水线：阶段 1（v3.1 池上的 TF-IDF + LR）不使用任何 v4.0 标签，对 v3.1 指标的概率做同样的解码后再用规则 R 换算；
-  α 在同一验证集上选。v3.1 的严重程度：AV N>A>L>P，AC L>H，PR N>L>H，UI N>R，S C>U，C/I/A H>L>N。
-输出：results/review_checks/risk_baselines.md、risk_baselines.json（含每个 α 的测试集结果，可画权衡曲线）
+Same rule and α selection as risk_decode.py: the candidate set is the classes with probability >= α × the maximum probability, and the
+most severe of them is taken; among the α that lower the mean validation macro-F1 by at most 0.01 relative to argmax, the one with the
+lowest validation underestimation rate is selected.
+- TF-IDF: a model trained on the first 90% of the training part (by publication date) selects α on the last 10% (the validation set,
+  the same as for DeBERTa); the test probabilities come from the model trained on the whole training part (identical to the argmax
+  TF-IDF results in the paper's tables; α = 1 reproduces them).
+- Pipeline: stage 1 (TF-IDF + LR on the v3.1 pool) uses no v4.0 labels; the same decoding is applied to the probabilities of the v3.1
+  metrics before conversion with rule R; α is selected on the same validation set. Severity order of the v3.1 values:
+  AV N>A>L>P, AC L>H, PR N>L>H, UI N>R, S C>U, C/I/A H>L>N.
+Output: results/review_checks/risk_baselines.md, risk_baselines.json (with the test results for every α, for trade-off curves)
 """
 
 import json
@@ -105,27 +109,27 @@ def main():
         n_fit = int(round(len(train) * 0.9))
         fit, val = train.iloc[:n_fit], train.iloc[n_fit:]
         test = test.reset_index(drop=True)
-        print(f"== {split}: 训练 {len(train):,}（α 选择用前 {len(fit):,} 条）/ 验证 {len(val):,} / 测试 {len(test):,}", flush=True)
+        print(f"== {split}: training {len(train):,} (α selection uses the first {len(fit):,}) / validation {len(val):,} / test {len(test):,}", flush=True)
         ys = {k: train["y_" + k].values for k in M40}
         yfit = {k: fit["y_" + k].values for k in M40}
         (pv,) = fit_probs(fit["text"], yfit, [val["text"]], M40, 2, 200_000)
         (pt,) = fit_probs(train["text"], ys, [test["text"]], M40, 2, 200_000)
         res = {"tfidf": scan(val, test, pv, pt, SEVERITY, False)}
-        print("  TF-IDF 完成，选定 α =", res["tfidf"]["chosen_alpha"], flush=True)
+        print("  TF-IDF done, selected α =", res["tfidf"]["chosen_alpha"], flush=True)
         pv31, pt31 = fit_probs(pool["text"], {k: pool["z_" + k].values for k in M31}, [val["text"], test["text"]], M31, 3, 300_000)
         res["pipeline_R"] = scan(val, test, pv31, pt31, SEV31, True)
-        print("  流水线完成，选定 α =", res["pipeline_R"]["chosen_alpha"], flush=True)
+        print("  pipeline done, selected α =", res["pipeline_R"]["chosen_alpha"], flush=True)
         part_path(split).write_text(json.dumps(res, indent=1), encoding="utf-8")
     results = {s: json.loads(part_path(s).read_text(encoding="utf-8")) for s in SPLITS if part_path(s).exists()}
-    lines = ["# TF-IDF 与流水线（规则 R）的风险敏感解码（测试集；α 在验证集上选）\n",
-             "| 划分 | 方法 | 解码 | α | 平均宏 F1 | 等级准确率 | 低估率 | 高估率 | H+C 召回 | MAE |", "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["# Risk-sensitive decoding of TF-IDF and the pipeline (rule R) (test set; α selected on the validation set)\n",
+             "| Split | Method | Decoding | α | Mean macro-F1 | Band accuracy | Underestimation | Overestimation | H+C recall | MAE |", "|---|---|---|---|---|---|---|---|---|---|"]
     for split, r in results.items():
         for m, x in r.items():
-            for name, row in [("argmax", x["argmax"]), ("风险敏感", x["chosen"])]:
+            for name, row in [("argmax", x["argmax"]), ("risk-sensitive", x["chosen"])]:
                 over = 1 - row["test_band_acc"] - row["test_under_rate"]
                 lines.append(f"| {split} | {m} | {name} | {row['alpha']:.1f} | {row['test_mean_macro_f1']:.3f} | {row['test_band_acc']:.3f} | "
                              f"{row['test_under_rate']:.3f} | {over:.3f} | {row['test_hc_recall']:.3f} | {row['test_score_mae']:.3f} |")
-    lines += ["\n## 时间划分：各 α 下的测试集结果（权衡曲线）\n", "| 方法 | α | 平均宏 F1 | 等级准确率 | 低估率 | 高估率 | 非 derived 等级准确率 | 非 derived 低估率 |", "|---|---|---|---|---|---|---|---|"]
+    lines += ["\n## Temporal split: test results at each α (trade-off curve)\n", "| Method | α | Mean macro-F1 | Band accuracy | Underestimation | Overestimation | Non-derived band accuracy | Non-derived underestimation |", "|---|---|---|---|---|---|---|---|"]
     for m, x in results.get("temporal", {}).items():
         for row in x["scan"]:
             lines.append(f"| {m} | {row['alpha']:.1f} | {row['test_mean_macro_f1']:.3f} | {row['test_band_acc']:.3f} | {row['test_under_rate']:.3f} | "

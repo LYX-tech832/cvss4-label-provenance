@@ -1,15 +1,16 @@
-"""三项补充分析（10-08；CPU，约 5 分钟；只读已有的预测和数据）。
+"""Three further analyses (CPU, about 5 minutes; reads only existing predictions and data).
 
-A. NVD 参照里"评估者不同"与"版本不同"的分离：在同时有 CNA v3.1、CNA v4.0 和 NVD v3.1 向量的 CVE 上，
-   逐项比较 ①同一 CNA 的 v3.1 向量 对 NVD 的 v3.1 向量（同版本，只有评估者不同）与
-   ②同一 CNA 的 v4.0 向量 对 NVD 的 v3.1 向量（论文表 S34 的口径，评估者和版本都不同）。
-   7 项的定义与 nvd_reference.py 相同：AV、AC、PR；UI 是否需要交互；C/I/A 对 max(V, S)。
-B. 风险敏感解码按代价比选 α：每条低估计 r、高估计 1，α 在**验证集**上按期望代价最低来选，再报告测试集代价
-   （表 S20 原来是在测试集上选的，只能算探索性比较）。DeBERTa + 辅助任务读各种子的 risk_decode.json（逐种子选 α，
-   测试代价取 5 个种子的平均）；TF-IDF 和流水线读 risk_baselines_temporal.json（选 α 用的验证概率来自只在训练部分前 90% 上拟合的模型）。
-C. 论文主结果表要补的行：DeBERTa 流水线、规则 R 伪标签、顺序微调（种子 0–2），SecureBERT 的两个模型（种子 0–4），
-   时间划分，全部 / 非 derived；并重算已有的 DeBERTa 两行作核对。
-输出：results/review_checks/summary17.md
+A. Separating "different assessor" from "different version" in the NVD reference: on the CVEs with a CNA v3.1, a CNA v4.0 and an NVD
+   v3.1 vector, item by item, (1) the same CNA's v3.1 vector against the NVD's v3.1 vector (same version, only the assessor differs) and
+   (2) the same CNA's v4.0 vector against the NVD's v3.1 vector (as in Table S34; both assessor and version differ).
+   The 7 items are defined as in nvd_reference.py: AV, AC, PR; whether user interaction is required; C/I/A against max(V, S).
+B. Risk-sensitive decoding with α selected by cost ratio: r per underestimate and 1 per overestimate; α is selected on the **validation
+   set** by the lowest expected cost, and the test cost is reported. DeBERTa + auxiliary task reads risk_decode.json of each seed (α
+   selected per seed, test cost averaged over 5 seeds); TF-IDF and the pipeline read risk_baselines_temporal.json (the validation
+   probabilities used to select α come from models fitted only on the first 90% of the training part).
+C. Additional rows of the main results table: DeBERTa pipeline, rule-R pseudo-labels, sequential fine-tuning (seeds 0-2), the two
+   SecureBERT models (seeds 0-4), temporal split, all / non-derived; the two existing DeBERTa rows are recomputed as a check.
+Output: results/review_checks/summary17.md
 """
 
 import json
@@ -41,31 +42,31 @@ def part_a(df, lines):
     s_eq = (own31["S"] == ref["S"]).astype(float)
     b31, b40 = band31(d, "x31_"), Encoded(d, "y_").band
     main = ["VulDB", "VulnCheck", "GitHub_M"]
-    groups = [("VulDB（derived）", (d["source"] == "VulDB").to_numpy()), ("VulnCheck", (d["source"] == "VulnCheck").to_numpy()),
-              ("GitHub", (d["source"] == "GitHub_M").to_numpy()), ("其他来源", (~d["source"].isin(main)).to_numpy()),
-              ("非 derived 合计", (d["label_type"] != "derived").to_numpy())]
-    lines += ["## A. 同一批 CVE 上，CNA 的 v3.1 向量和 v4.0 向量分别对 NVD 的 v3.1 向量\n",
-              f"范围：同时有 CNA v3.1、CNA v4.0 和 NVD v3.1 向量的 CVE，共 {len(d):,} 条。每格：与 NVD 取值相同的比例。"
-              "“7 项全同”不含 Scope；“向量全同”是 v3.1 的 8 个指标全部相同（与 Note S9 的 3.1% / 14.2% / 28.4% 同一口径）。\n",
-              "| 来源 | n | 比较 | " + " | ".join(SHARED) + " | 7 项全同 | Scope | 向量全同 | 等级相同 | CNA 更低 / 更高 |",
+    groups = [("VulDB (derived)", (d["source"] == "VulDB").to_numpy()), ("VulnCheck", (d["source"] == "VulnCheck").to_numpy()),
+              ("GitHub", (d["source"] == "GitHub_M").to_numpy()), ("other sources", (~d["source"].isin(main)).to_numpy()),
+              ("non-derived total", (d["label_type"] != "derived").to_numpy())]
+    lines += ["## A. The CNA's v3.1 vector and its v4.0 vector, each against the NVD's v3.1 vector, on the same CVEs\n",
+              f"Scope: CVEs with a CNA v3.1, a CNA v4.0 and an NVD v3.1 vector, {len(d):,} in total. Each cell: share with the same value as the NVD. "
+              "\"All 7 equal\" excludes Scope; \"vector equal\" means all 8 v3.1 metrics are equal (the same definition as the 3.1% / 14.2% / 28.4% in Note S9).\n",
+              "| Source | n | Comparison | " + " | ".join(SHARED) + " | All 7 equal | Scope | Vector equal | Same band | CNA lower / higher |",
               "|---|---|---|" + "---|" * (len(SHARED) + 5)]
     for name, m in groups:
         if m.sum() < 30:
-            lines.append(f"| {name} | {int(m.sum())} | 不足 30 条，不列 |" + " |" * (len(SHARED) + 5))
+            lines.append(f"| {name} | {int(m.sum())} | fewer than 30, not listed |" + " |" * (len(SHARED) + 5))
             continue
         full = (m31[m].all(1) & (s_eq[m] == 1)).mean()
-        lines.append(f"| {name} | {int(m.sum()):,} | CNA v3.1 对 NVD v3.1 | " + " | ".join(f"{m31[m][:, j].mean():.3f}" for j in range(len(SHARED)))
+        lines.append(f"| {name} | {int(m.sum()):,} | CNA v3.1 vs NVD v3.1 | " + " | ".join(f"{m31[m][:, j].mean():.3f}" for j in range(len(SHARED)))
                      + f" | {m31[m].all(1).mean():.3f} | {s_eq[m].mean():.3f} | {full:.3f} | {(b31[m] == ref_band[m]).mean():.3f} | "
                      f"{(b31[m] < ref_band[m]).mean():.3f} / {(b31[m] > ref_band[m]).mean():.3f} |")
-        lines.append(f"| | | CNA v4.0 对 NVD v3.1 | " + " | ".join(f"{m40[m][:, j].mean():.3f}" for j in range(len(SHARED)))
+        lines.append(f"| | | CNA v4.0 vs NVD v3.1 | " + " | ".join(f"{m40[m][:, j].mean():.3f}" for j in range(len(SHARED)))
                      + f" | {m40[m].all(1).mean():.3f} | — | — | {(b40[m] == ref_band[m]).mean():.3f} | "
                      f"{(b40[m] < ref_band[m]).mean():.3f} / {(b40[m] > ref_band[m]).mean():.3f} |")
-        lines.append(f"| | | 差（v4.0 − v3.1） | " + " | ".join(f"{m40[m][:, j].mean() - m31[m][:, j].mean():+.3f}" for j in range(len(SHARED)))
+        lines.append(f"| | | difference (v4.0 − v3.1) | " + " | ".join(f"{m40[m][:, j].mean() - m31[m][:, j].mean():+.3f}" for j in range(len(SHARED)))
                      + f" | {m40[m].all(1).mean() - m31[m].all(1).mean():+.3f} | — | — | {(b40[m] == ref_band[m]).mean() - (b31[m] == ref_band[m]).mean():+.3f} | — |")
     # 同一 CNA 自己的两个版本在 7 项上是否相同（版本之间改了多少）
     self_eq = match(shared_from_v4(d, "y_"), own31)
-    lines += ["\n同一 CNA 的 v4.0 向量与它自己的 v3.1 向量在 7 项上相同的比例（版本之间改了多少）：\n",
-              "| 来源 | n | " + " | ".join(SHARED) + " | 7 项全同 |", "|---|---|" + "---|" * (len(SHARED) + 1)]
+    lines += ["\nShare of the same CNA's v4.0 vectors equal to its own v3.1 vectors on the 7 items (how much changes between versions):\n",
+              "| Source | n | " + " | ".join(SHARED) + " | All 7 equal |", "|---|---|" + "---|" * (len(SHARED) + 1)]
     for name, m in groups:
         if m.sum() >= 30:
             lines.append(f"| {name} | {int(m.sum()):,} | " + " | ".join(f"{self_eq[m][:, j].mean():.3f}" for j in range(len(SHARED))) + f" | {self_eq[m].all(1).mean():.3f} |")
@@ -77,10 +78,10 @@ def part_b(lines):
     def cost(row, part, r):
         u = row[f"{part}_under_rate"]
         return r * u + (1 - row[f"{part}_band_acc"] - u)
-    lines += ["\n## B. 按代价比在验证集上选 α（每条低估计 r、高估计 1；时间划分）\n",
-              "每格：验证集选出的 α / 该 α 的测试集代价 / argmax 的测试集代价 /（测试集上代价最低的 α 及其代价，仅作对照）。"
-              "DeBERTa + 辅助任务逐种子选 α，代价取 5 个种子的平均，α 列出 5 个种子各自选中的值。\n",
-              "| 方法 | r = 1 | r = 2 | r = 5 | r = 10 |", "|---|---|---|---|---|"]
+    lines += ["\n## B. α selected on the validation set by cost ratio (r per underestimate, 1 per overestimate; temporal split)\n",
+              "Each cell: α selected on the validation set / test cost at that α / test cost of argmax / (the α with the lowest test cost and its cost, for comparison only). "
+              "DeBERTa + auxiliary task selects α per seed; the cost is averaged over the 5 seeds, and the α column lists the value selected for each of the 5 seeds.\n",
+              "| Method | r = 1 | r = 2 | r = 5 | r = 10 |", "|---|---|---|---|---|"]
     runs = [json.loads((ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "risk_decode.json").read_text(encoding="utf-8")) for s in range(5)]
     cells = []
     for r in ratios:
@@ -93,32 +94,32 @@ def part_b(lines):
         alphas = sorted({row["alpha"] for row in runs[0]["scan"]}, reverse=True)
         mean_test = {a: np.mean([cost(next(row for row in run["scan"] if abs(row["alpha"] - a) < 1e-9), "test", r) for run in runs]) for a in alphas}
         oracle = min(mean_test, key=mean_test.get)
-        cells.append(f"α = {', '.join(f'{a:.1f}' for a in picks)} / {np.mean(tests):.3f} / {np.mean(argm):.3f} /（{oracle:.1f}：{mean_test[oracle]:.3f}）")
-    lines.append("| DeBERTa + v3.1 辅助 | " + " | ".join(cells) + " |")
+        cells.append(f"α = {', '.join(f'{a:.1f}' for a in picks)} / {np.mean(tests):.3f} / {np.mean(argm):.3f} / ({oracle:.1f}: {mean_test[oracle]:.3f})")
+    lines.append("| DeBERTa + v3.1 auxiliary | " + " | ".join(cells) + " |")
     rb = json.loads((ROOT / "results" / "review_checks" / "risk_baselines_temporal.json").read_text(encoding="utf-8"))
-    for name, key in [("TF-IDF + LR", "tfidf"), ("TF-IDF 流水线（规则 R）", "pipeline_R")]:
+    for name, key in [("TF-IDF + LR", "tfidf"), ("TF-IDF pipeline (rule R)", "pipeline_R")]:
         scan = rb[key]["scan"]
         cells = []
         for r in ratios:
             best = min(scan, key=lambda row: cost(row, "val", r))
             arg = next(row for row in scan if abs(row["alpha"] - 1.0) < 1e-9)
             oracle = min(scan, key=lambda row: cost(row, "test", r))
-            cells.append(f"α = {best['alpha']:.1f} / {cost(best, 'test', r):.3f} / {cost(arg, 'test', r):.3f} /（{oracle['alpha']:.1f}：{cost(oracle, 'test', r):.3f}）")
+            cells.append(f"α = {best['alpha']:.1f} / {cost(best, 'test', r):.3f} / {cost(arg, 'test', r):.3f} / ({oracle['alpha']:.1f}: {cost(oracle, 'test', r):.3f})")
         lines.append(f"| {name} | " + " | ".join(cells) + " |")
-    lines.append("\n（TF-IDF 和流水线的验证集取值来自只在训练部分前 90% 上拟合的模型，测试集取值来自在全部训练部分上拟合的模型；见 risk_decode_baselines.py。）")
+    lines.append("\n(The validation values of TF-IDF and the pipeline come from models fitted only on the first 90% of the training part, the test values from models fitted on the whole training part; see risk_decode_baselines.py.)")
 
 
 def part_c(df, lines):
-    rows = [("DeBERTa（选中的 25 轮，种子 0–4；核对）", [ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" for s in range(5)]),
-            ("DeBERTa + v3.1 aux.（种子 0–4；核对）", [ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" for s in range(5)]),
-            ("规则 R 伪标签（种子 0–2）", [ENC / f"T2_temporal_deberta-v3-base_none_pseudo_e5_cwinv_sqrt_s{s}" for s in range(3)]),
-            ("顺序微调，25 轮（种子 0–2）", [ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_seq_s{s}" for s in range(3)]),
-            ("DeBERTa 流水线（种子 0–2）", [ENC / f"T2_temporal_deberta-v3-base_none_v31only_e5_s{s}" for s in range(3)]),
-            ("SecureBERT（种子 0–4）", [ENC / f"T2_temporal_SecureBERT_none_e5_cwinv_sqrt_s{s}" for s in range(5)]),
-            ("SecureBERT + v3.1 aux.（种子 0–4）", [ENC / f"T2_temporal_SecureBERT_none_aux_lam1_e5_cwinv_sqrt_s{s}" for s in range(5)])]
-    lines += ["\n## C. 主结果表要补的行（时间划分；各种子平均）\n"]
-    for scope, title in [("all", "全部（21,900）"), ("non_derived", "非 derived（16,749）")]:
-        lines += [f"\n### {title}\n", "| 方法 | " + " | ".join(n for _, n in COLS) + " | 种子数 |", "|---|" + "---|" * (len(COLS) + 1)]
+    rows = [("DeBERTa (selected 25 epochs, seeds 0–4; check)", [ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" for s in range(5)]),
+            ("DeBERTa + v3.1 aux. (seeds 0–4; check)", [ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" for s in range(5)]),
+            ("rule-R pseudo-labels (seeds 0–2)", [ENC / f"T2_temporal_deberta-v3-base_none_pseudo_e5_cwinv_sqrt_s{s}" for s in range(3)]),
+            ("sequential fine-tuning, 25 epochs (seeds 0–2)", [ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_seq_s{s}" for s in range(3)]),
+            ("DeBERTa pipeline (seeds 0–2)", [ENC / f"T2_temporal_deberta-v3-base_none_v31only_e5_s{s}" for s in range(3)]),
+            ("SecureBERT (seeds 0–4)", [ENC / f"T2_temporal_SecureBERT_none_e5_cwinv_sqrt_s{s}" for s in range(5)]),
+            ("SecureBERT + v3.1 aux. (seeds 0–4)", [ENC / f"T2_temporal_SecureBERT_none_aux_lam1_e5_cwinv_sqrt_s{s}" for s in range(5)])]
+    lines += ["\n## C. Additional rows of the main results table (temporal split; mean over seeds)\n"]
+    for scope, title in [("all", "all (21,900)"), ("non_derived", "non-derived (16,749)")]:
+        lines += [f"\n### {title}\n", "| Method | " + " | ".join(n for _, n in COLS) + " | Seeds |", "|---|" + "---|" * (len(COLS) + 1)]
         for name, dirs in rows:
             dd = {i: d for i, d in enumerate(dirs) if (d / "pred_latent.parquet").exists()}
             m = describe(dd, df, scope)
@@ -128,13 +129,13 @@ def part_c(df, lines):
 def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
-    lines = ["# NVD 参照中评估者与版本的分离、按期望代价选 α、主结果表的补充行（自动生成）\n"]
+    lines = ["# Assessor and version in the NVD reference, α selected by expected cost, additional rows of the main results table (generated automatically)\n"]
     part_a(df, lines)
     part_b(lines)
     part_c(df, lines)
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
-    print(f"\n已写入 {OUT}")
+    print(f"\nwritten to {OUT}")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# 两项补充 GPU 实验：
-#   1. 打乱 v3.1 标签的负对照：时间划分，W4 选定配置（5 轮、inv_sqrt、λ=0.5），--aux_v31 --aux_shuffle，种子 0–2；
-#   2. 三个 LOSO 划分的无辅助基线训练 10 轮（时间划分上已表明 5 轮不够，而辅助模型 10 轮不变），先种子 0–2，再 3–4。
-# 支持中断后续跑（--skip_existing）。汇总：python src/review_gpu2_summary.py（CPU）
+# Two additional GPU experiments:
+#   1. Negative control with shuffled v3.1 labels: temporal split, configuration selected in W4 (5 epochs, inv_sqrt, λ=0.5),
+#      --aux_v31 --aux_shuffle, seeds 0-2;
+#   2. The baseline trained for 10 epochs on the three LOSO splits (on the temporal split, 5 epochs proved too few for the baseline,
+#      while the auxiliary model stays at 10 epochs), seeds 0-2 first, then 3-4.
+# Resumable after an interruption (--skip_existing). Summary: python src/review_gpu2_summary.py (CPU)
 set -o pipefail
 cd "$(dirname "$0")/.."
 MODEL=${MODEL:-microsoft/deberta-v3-base}

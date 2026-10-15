@@ -1,9 +1,10 @@
-"""多向量记录与种子不确定性的 CPU 核查（几分钟）：
+"""Records with several vectors and seed uncertainty (CPU, a few minutes):
 
-1. 多向量记录：CNA 容器里有多个 v4.0（或 v3.1）向量的记录取第一个；排除这些记录后，
-   主要方法在时间划分测试集上的结果变化多少，VulDB 的 FD_oos 变化多少。
-2. LOSO 十轮比较的种子不确定性：辅助 5 轮 − 无辅助 10 轮的逐种子差值与 t 区间（4 自由度）。
-输出：results/review_checks/summary7.md
+1. Records with several vectors: when the CNA container holds several v4.0 (or v3.1) vectors, the first one is used; how much do the
+   results of the main methods on the temporal split test set, and VulDB's FD_oos, change when these records are excluded?
+2. Seed uncertainty of the ten-epoch LOSO comparison: per-seed differences auxiliary 5 epochs − baseline 10 epochs, with t intervals
+   (4 degrees of freedom).
+Output: results/review_checks/summary7.md
 """
 
 import json
@@ -36,15 +37,15 @@ def part1(lines):
     multi = (multi40 | multi31) & set(df["cve_id"])
     test = df[df["pub"] >= CUTOFF].reset_index(drop=True)
     keep = ~test["cve_id"].isin(multi).to_numpy()
-    lines += ["## 1. 多向量记录\n",
-              f"v4.0 数据集中 CNA 给了多个 v4.0 向量的记录 {len(multi40 & set(df['cve_id'])):,} 条，"
-              f"有 v4.0 且 CNA 给了多个 v3.1 向量的 {len(multi31 & set(df['cve_id'])):,} 条，合计（去重）{len(multi):,} 条；"
-              f"其中时间划分测试集 {int((~keep).sum()):,} 条、训练与验证部分 {len(multi) - int((~keep).sum()):,} 条。\n",
-              "排除这些测试 CVE 后（模型不重训；训练集里的这些记录照常使用），平均宏 F1 / 等级准确率的变化：\n",
-              "| 方法 | 全部：原值 → 排除后 | 非 derived：原值 → 排除后 |", "|---|---|---|"]
+    lines += ["## 1. Records with several vectors\n",
+              f"Records of the v4.0 dataset whose CNA gave several v4.0 vectors: {len(multi40 & set(df['cve_id'])):,}; "
+              f"records with a v4.0 vector whose CNA gave several v3.1 vectors: {len(multi31 & set(df['cve_id'])):,}; together (deduplicated) {len(multi):,}; "
+              f"of these, {int((~keep).sum()):,} are in the temporal split test set and {len(multi) - int((~keep).sum()):,} in the training and validation parts.\n",
+              "Change of mean macro-F1 / band accuracy when these test CVEs are excluded (models not retrained; these records are used as usual in training):\n",
+              "| Method | All: original → excluded | Non-derived: original → excluded |", "|---|---|---|"]
     runs = {"TF-IDF + LR": [ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_tfidf_lr.parquet"],
-            "DeBERTa（5 种子）": [ENC / f"T2_temporal_deberta-v3-base_none_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet" for s in range(5)],
-            "DeBERTa + 辅助（5 种子）": [ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet" for s in range(5)]}
+            "DeBERTa (5 seeds)": [ENC / f"T2_temporal_deberta-v3-base_none_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet" for s in range(5)],
+            "DeBERTa + auxiliary task (5 seeds)": [ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet" for s in range(5)]}
     nd = (test["label_type"] != "derived").to_numpy()
     for name, paths in runs.items():
         ps = [pd.read_parquet(p).set_index("cve_id").loc[test["cve_id"]].reset_index() for p in paths]
@@ -56,12 +57,12 @@ def part1(lines):
             cells.append(f"{f(a, 'mean_macro_f1'):.3f} / {f(a, 'band_acc'):.3f} → {f(b, 'mean_macro_f1'):.3f} / {f(b, 'band_acc'):.3f}")
         lines.append(f"| {name} | {cells[0]} | {cells[1]} |")
     by_src = test.loc[~keep, "source"].value_counts().head(8)
-    lines.append("\n测试集中这些记录的来源（前 8）：" + "；".join(f"{s} {n}" for s, n in by_src.items()) + "\n")
+    lines.append("\nSources of these records in the test set (top 8): " + "; ".join(f"{s} {n}" for s, n in by_src.items()) + "\n")
 
 
 def part2(lines):
-    lines += ["\n## 2. LOSO：辅助 5 轮 − 无辅助 10 轮的逐种子差值（平均宏 F1）\n",
-              "| 留出 | 逐种子差值（种子 0–4） | 均值 | t 区间（4 自由度） | 为正的种子数 |", "|---|---|---|---|---|"]
+    lines += ["\n## 2. LOSO: per-seed differences auxiliary 5 epochs − baseline 10 epochs (mean macro-F1)\n",
+              "| Held out | Per-seed differences (seeds 0–4) | Mean | t interval (4 degrees of freedom) | Positive seeds |", "|---|---|---|---|---|"]
     for sp in ["VulnCheck", "GitHub_M", "VulDB"]:
         f = lambda tag, s: json.loads((ENC / f"T2_loso-{sp}_deberta-v3-base_none{tag}_s{s}" / "results.json").read_text(encoding="utf-8"))["latent"]["mean_macro_f1"]  # noqa: E731
         d = np.array([f("_aux_e5_cwinv_sqrt", s) - f("_e10_cwinv_sqrt", s) for s in range(5)])
@@ -70,7 +71,7 @@ def part2(lines):
 
 
 def main():
-    lines = ["# 多向量记录与种子不确定性的 CPU 核查（自动生成）\n"]
+    lines = ["# Records with several vectors and seed uncertainty (generated automatically)\n"]
     part1(lines)
     part2(lines)
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")

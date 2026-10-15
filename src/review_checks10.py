@@ -1,16 +1,22 @@
-"""补充的两项检查（10-07，CPU）。
+"""Two checks (CPU).
 
-A. TF-IDF 的设置是否影响"分类器与流水线的排名翻转"（时间划分，T2）。论文里 TF-IDF + LR 的 C = 4 和两套特征设置
-   （分类器：最小文档频率 2、至多 20 万特征；流水线第一阶段：3、30 万）是一开始就定下的，没有调过。这里：
-   - 分类器取 C ∈ {0.25, 1, 4, 16, 64, 256}（验证集上的最优值起初落在 16 这个边界上，所以向上扩了两档）：在验证集（训练数据里最新的 10%）上算平均宏 F1，再用全部训练标签重训、在测试集上评估；
-   - 流水线第一阶段取 C ∈ {1, 4, 16}：在 v3.1 语料最新的 10% 上算 v3.1 的平均宏 F1，再用全部语料重训；
-   - 两边交换特征设置各跑一次（C = 4）；
-   - 大模型样本（2,000 条）上 DeepSeek-V4-Pro 与各个 C 的分类器的平均宏 F1 之差（论文 7.5 节的那处翻转）；
-   - 报告各组合下"分类器 − 流水线"的等级准确率差（全部 / 非 derived），以及按各自验证集选出的组合的配对 bootstrap 区间。
-   每个配置的预测缓存在 results/tfidf_sensitivity/，可以分多次跑完。约 1–1.5 小时。
-B. 表 S14 的补充行：带辅助任务的模型只用种子 0–2 时的结果（表里原来是 5 个种子，而 Note S6 的差值是按 3 个种子算的）。几秒。
-输出：results/review_checks/summary16.md
-用法：python src/review_checks10.py [a|b|all]
+A. Do the TF-IDF settings affect the ranking reversal between the classifier and the pipeline (temporal split, T2)? The paper's C = 4
+   of TF-IDF + LR and the two feature settings (classifier: minimum document frequency 2, at most 200,000 features; first stage of the
+   pipeline: 3 and 300,000) were fixed at the start and not tuned. This script:
+   - classifier with C in {0.25, 1, 4, 16, 64, 256} (the grid extends two steps above 16 because the validation optimum lay at 16 on a
+     smaller grid): mean macro-F1 on the validation set (the latest 10% of the training data), then retrained on all training labels and
+     evaluated on the test set;
+   - first stage of the pipeline with C in {1, 4, 16}: mean macro-F1 of v3.1 on the latest 10% of the v3.1 corpus, then retrained on the
+     whole corpus;
+   - each side run once with the other side's feature setting (C = 4);
+   - on the LLM sample (2,000 CVEs), the mean macro-F1 difference between DeepSeek-V4-Pro and the classifier at each C (the reversal in
+     Section 7.5);
+   - the band accuracy difference "classifier − pipeline" for each combination (all / non-derived), and paired bootstrap intervals for
+     the combination selected on each side's validation set.
+   The predictions of each configuration are cached in results/tfidf_sensitivity/, so the runs can be split. About 1-1.5 hours.
+B. Additional row of Table S14: the auxiliary-task model with seeds 0-2 only (the differences in Note S6 use 3 seeds). Seconds.
+Output: results/review_checks/summary16.md
+Usage: python src/review_checks10.py [a|b|all]
 """
 
 import json
@@ -57,7 +63,7 @@ def fit_predict(train_text, ys, queries, C, feat):
 
 
 def cached(name, fn):
-    """fn() 返回 (测试集预测, 验证得分)；结果缓存。"""
+    """fn() returns (test predictions, validation score); the result is cached."""
     f, g = CACHE / f"{name}.parquet", CACHE / f"{name}.json"
     if f.exists() and g.exists():
         return pd.read_parquet(f), json.loads(g.read_text())["val"]
@@ -65,7 +71,7 @@ def cached(name, fn):
     pred, val = fn()
     pred.to_parquet(f, index=False)
     g.write_text(json.dumps({"val": val, "seconds": round(time.time() - t0)}))
-    print(f"  {name}: 验证 {val}, 用时 {time.time() - t0:.0f} 秒", flush=True)
+    print(f"  {name}: validation {val}, {time.time() - t0:.0f} s", flush=True)
     return pred, val
 
 
@@ -102,7 +108,7 @@ def part_a(lines):
             return convert(p31, True).assign(cve_id=test["cve_id"].values), round(v, 4)
         return cached(f"pipe_C{C}_df{feat[0]}", run)
 
-    print(f"A：分类器训练 {len(train):,}（验证 {n_val:,}），语料 {len(pool):,}（验证 {pn:,}），测试 {len(test):,}", flush=True)
+    print(f"A: classifier training {len(train):,} (validation {n_val:,}), corpus {len(pool):,} (validation {pn:,}), test {len(test):,}", flush=True)
     clfs = {C: clf(C, F_CLF) for C in C_CLF}
     clf_swap = clf(4.0, F_PIPE)
     pipes = {C: pipe(C, F_PIPE) for C in C_PIPE}
@@ -114,19 +120,19 @@ def part_a(lines):
     ec = {C: enc(p) for C, (p, _) in clfs.items()}
     ep = {C: enc(p) for C, (p, _) in pipes.items()}
     sc = lambda e: (fast_scores(t, e, alli), fast_scores(t, e, ndi))  # noqa: E731
-    lines += ["## A. TF-IDF 的设置与排名翻转（时间划分；测试集 21,900 条，非 derived 16,749 条）\n",
-              f"分类器在 {len(fit):,} 条上训练、{n_val:,} 条上验证后，用全部 {len(train):,} 条重训；流水线第一阶段在 v3.1 语料的 {len(pfit):,} 条上训练、{pn:,} 条上验证后，用全部 {len(pool):,} 条重训。\n",
-              "### 分类器（TF-IDF + LR，v4.0 标签；最小文档频率 2，至多 20 万特征）\n",
-              "| C | 验证集平均宏 F1 | 测试：平均宏 F1 全部 / 非 derived | 测试：等级准确率 全部 / 非 derived |", "|---|---|---|---|"]
+    lines += ["## A. TF-IDF settings and the ranking reversal (temporal split; 21,900 test labels, 16,749 non-derived)\n",
+              f"The classifier is trained on {len(fit):,} and validated on {n_val:,} CVEs, then retrained on all {len(train):,}; the first stage of the pipeline is trained on {len(pfit):,} and validated on {pn:,} CVEs of the v3.1 corpus, then retrained on all {len(pool):,}.\n",
+              "### Classifier (TF-IDF + LR, v4.0 labels; minimum document frequency 2, at most 200,000 features)\n",
+              "| C | Mean validation macro-F1 | Test: mean macro-F1 all / non-derived | Test: band accuracy all / non-derived |", "|---|---|---|---|"]
     for C, (p, v) in clfs.items():
         a, b = sc(ec[C])
-        lines.append(f"| {C:g}{'（论文）' if C == 4.0 else ''} | {v:.4f} | {a['mean_macro_f1']:.3f} / {b['mean_macro_f1']:.3f} | {a['band_acc']:.3f} / {b['band_acc']:.3f} |")
-    lines += ["\n### 流水线（第一阶段 TF-IDF + LR 预测 v3.1，再用规则 R 换算；最小文档频率 3，至多 30 万特征）\n",
-              "| C | 验证：v3.1 平均宏 F1 | 测试：平均宏 F1 全部 / 非 derived | 测试：等级准确率 全部 / 非 derived |", "|---|---|---|---|"]
+        lines.append(f"| {C:g}{' (paper)' if C == 4.0 else ''} | {v:.4f} | {a['mean_macro_f1']:.3f} / {b['mean_macro_f1']:.3f} | {a['band_acc']:.3f} / {b['band_acc']:.3f} |")
+    lines += ["\n### Pipeline (first stage TF-IDF + LR predicts v3.1, then conversion with rule R; minimum document frequency 3, at most 300,000 features)\n",
+              "| C | Validation: v3.1 mean macro-F1 | Test: mean macro-F1 all / non-derived | Test: band accuracy all / non-derived |", "|---|---|---|---|"]
     for C, (p, v) in pipes.items():
         a, b = sc(ep[C])
-        lines.append(f"| {C:g}{'（论文）' if C == 4.0 else ''} | {v:.4f} | {a['mean_macro_f1']:.3f} / {b['mean_macro_f1']:.3f} | {a['band_acc']:.3f} / {b['band_acc']:.3f} |")
-    lines += ["\n### 等级准确率之差：分类器 − 流水线，全部 / 非 derived\n", "| 分类器 C ＼ 流水线 C | " + " | ".join(f"{c:g}" for c in C_PIPE) + " |", "|---|" + "---|" * len(C_PIPE)]
+        lines.append(f"| {C:g}{' (paper)' if C == 4.0 else ''} | {v:.4f} | {a['mean_macro_f1']:.3f} / {b['mean_macro_f1']:.3f} | {a['band_acc']:.3f} / {b['band_acc']:.3f} |")
+    lines += ["\n### Band accuracy difference: classifier − pipeline, all / non-derived\n", "| Classifier C vs pipeline C | " + " | ".join(f"{c:g}" for c in C_PIPE) + " |", "|---|" + "---|" * len(C_PIPE)]
     da, dn = [], []
     for cc in C_CLF:
         cells = []
@@ -137,8 +143,8 @@ def part_a(lines):
             dn.append(n)
             cells.append(f"{a:+.3f} / {n:+.3f}")
         lines.append(f"| {cc:g} | " + " | ".join(cells) + " |")
-    lines.append(f"\n{len(da)} 个组合里：全部标签上的差在 {min(da):+.3f} 到 {max(da):+.3f} 之间，非 derived 上在 {min(dn):+.3f} 到 {max(dn):+.3f} 之间；"
-                 f"全部标签上为正的 {sum(x > 0 for x in da)} 个，非 derived 上为负的 {sum(x < 0 for x in dn)} 个。")
+    lines.append(f"\nOver the {len(da)} combinations: the difference on all labels ranges from {min(da):+.3f} to {max(da):+.3f}, on the non-derived labels from {min(dn):+.3f} to {max(dn):+.3f}; "
+                 f"positive on all labels in {sum(x > 0 for x in da)}, negative on the non-derived labels in {sum(x < 0 for x in dn)}.")
     bc = max(clfs, key=lambda c: clfs[c][1])
     bp = max(pipes, key=lambda c: pipes[c][1])
     rng = np.random.default_rng(0)
@@ -148,16 +154,16 @@ def part_a(lines):
         d = hit_c[idx] - hit_p[idx]
         bs = [d[rng.integers(len(d), size=len(d))].mean() for _ in range(1000)]
         res.append(f"{d.mean():+.3f} [{np.percentile(bs, 2.5):+.3f}, {np.percentile(bs, 97.5):+.3f}]")
-    lines.append(f"\n按各自验证集选出的设置（分类器 C = {bc:g}，流水线 C = {bp:g}）：等级准确率之差 全部 {res[0]}，非 derived {res[1]}（配对 bootstrap，1,000 次）。"
-                 f"平均宏 F1 之差：全部 {sc(ec[bc])[0]['mean_macro_f1'] - sc(ep[bp])[0]['mean_macro_f1']:+.3f}，非 derived {sc(ec[bc])[1]['mean_macro_f1'] - sc(ep[bp])[1]['mean_macro_f1']:+.3f}。")
+    lines.append(f"\nSettings selected on each side's validation set (classifier C = {bc:g}, pipeline C = {bp:g}): band accuracy difference all {res[0]}, non-derived {res[1]} (paired bootstrap, 1,000 resamples). "
+                 f"Mean macro-F1 difference: all {sc(ec[bc])[0]['mean_macro_f1'] - sc(ep[bp])[0]['mean_macro_f1']:+.3f}, non-derived {sc(ec[bc])[1]['mean_macro_f1'] - sc(ep[bp])[1]['mean_macro_f1']:+.3f}.")
     llm = pd.read_parquet(ROOT / "results" / "autocvss_baseline" / "deepseek-v4-pro_DTD_s0" / "predictions.parquet")
     samp = df.set_index("cve_id").loc[llm["cve_id"]].reset_index()
     ts, el = Encoded(samp, "y_"), Encoded(llm)
     lt = samp["label_type"].to_numpy()
     strata = [np.flatnonzero(lt == x) for x in ["derived", "independent", "v4_only", "other"]]
     rng2 = np.random.default_rng(0)
-    lines += ["\n### 大模型样本（2,000 条）：DeepSeek-V4-Pro − 分类器 的平均宏 F1（配对 bootstrap，按标签类型分层，1,000 次）\n",
-              "| 分类器 C | 样本整体 | 非 derived（1,700） |", "|---|---|---|"]
+    lines += ["\n### LLM sample (2,000 CVEs): mean macro-F1 DeepSeek-V4-Pro − classifier (paired bootstrap stratified by label type, 1,000 resamples)\n",
+              "| Classifier C | Whole sample | Non-derived (1,700) |", "|---|---|---|"]
     for C, (p, _) in clfs.items():
         es = Encoded(p.set_index("cve_id").loc[llm["cve_id"]].reset_index())
 
@@ -167,14 +173,14 @@ def part_a(lines):
                     fast_scores(ts, el, nd)["mean_macro_f1"] - fast_scores(ts, es, nd)["mean_macro_f1"])
         pt = d(np.arange(len(samp)))
         bs = np.array([d(np.concatenate([rng2.choice(x, size=len(x), replace=True) for x in strata])) for _ in range(1000)])
-        lines.append(f"| {C:g}{'（论文）' if C == 4.0 else ''} | {pt[0]:+.3f} [{np.percentile(bs[:, 0], 2.5):+.3f}, {np.percentile(bs[:, 0], 97.5):+.3f}] | "
+        lines.append(f"| {C:g}{' (paper)' if C == 4.0 else ''} | {pt[0]:+.3f} [{np.percentile(bs[:, 0], 2.5):+.3f}, {np.percentile(bs[:, 0], 97.5):+.3f}] | "
                      f"{pt[1]:+.3f} [{np.percentile(bs[:, 1], 2.5):+.3f}, {np.percentile(bs[:, 1], 97.5):+.3f}] |")
-    lines += ["\n### 交换特征设置（C = 4）\n", "| 设置 | 测试：等级准确率 全部 / 非 derived | 分类器 − 流水线（全部 / 非 derived） |", "|---|---|---|"]
+    lines += ["\n### Feature settings swapped (C = 4)\n", "| Setting | Test: band accuracy all / non-derived | Classifier − pipeline (all / non-derived) |", "|---|---|---|"]
     es, ps = enc(clf_swap[0]), enc(pipe_swap[0])
     band = lambda e: ((t.band == e.band).mean(), (t.band[ndi] == e.band[ndi]).mean())  # noqa: E731
-    for name, ce, pe in [("论文的设置（分类器 2 / 20 万，流水线 3 / 30 万）", ec[4.0], ep[4.0]), ("分类器改用 3 / 30 万", es, ep[4.0]), ("流水线改用 2 / 20 万", ec[4.0], ps), ("两边都交换", es, ps)]:
+    for name, ce, pe in [("paper's settings (classifier 2 / 200,000, pipeline 3 / 300,000)", ec[4.0], ep[4.0]), ("classifier with 3 / 300,000", es, ep[4.0]), ("pipeline with 2 / 200,000", ec[4.0], ps), ("both swapped", es, ps)]:
         (ca, cn), (pa, pn_) = band(ce), band(pe)
-        lines.append(f"| {name} | 分类器 {ca:.3f} / {cn:.3f}；流水线 {pa:.3f} / {pn_:.3f} | {ca - pa:+.3f} / {cn - pn_:+.3f} |")
+        lines.append(f"| {name} | classifier {ca:.3f} / {cn:.3f}; pipeline {pa:.3f} / {pn_:.3f} | {ca - pa:+.3f} / {cn - pn_:+.3f} |")
 
 
 def part_b(lines):
@@ -184,9 +190,9 @@ def part_b(lines):
     clean = clean_mask(test).to_numpy() if hasattr(clean_mask(test), "to_numpy") else np.asarray(clean_mask(test))
     subsets = {"R-inc.": clean, "No v3.1": (~test["has_v31"]).to_numpy(), "R-inc., no VulnCheck": clean & (test["source"] != "VulnCheck").to_numpy()}
     atp = clean & (test["y_AT"] == "P").to_numpy()
-    lines += ["\n## B. 表 S14 的补充行：带辅助任务的模型（5 轮），5 个种子与种子 0–2\n",
-              "| 种子 | " + " | ".join(f"{k}（{int(m.sum()):,}）" for k, m in subsets.items()) + " | AT:P 预测为 None | AT 宏 F1（R-inc.） |", "|---|---|---|---|---|---|"]
-    for name, seeds in [("0–4（表里原有的一行）", range(5)), ("0–2", range(3))]:
+    lines += ["\n## B. Additional row of Table S14: the auxiliary-task model (5 epochs), 5 seeds and seeds 0–2\n",
+              "| Seeds | " + " | ".join(f"{k} ({int(m.sum()):,})" for k, m in subsets.items()) + " | AT:P predicted as None | AT macro-F1 (R-inc.) |", "|---|---|---|---|---|---|"]
+    for name, seeds in [("0–4 (the row already in the table)", range(5)), ("0–2", range(3))]:
         ps = [pd.read_parquet(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet").set_index("cve_id").loc[test["cve_id"]].reset_index() for s in seeds]
         cells = []
         for m in subsets.values():
@@ -201,14 +207,14 @@ def part_b(lines):
 
 def main():
     part = sys.argv[1] if len(sys.argv) > 1 else "all"
-    lines = ["# TF-IDF 设置的敏感性；表 S14 的三种子行（自动生成）\n"]
+    lines = ["# Sensitivity to the TF-IDF settings; three-seed row of Table S14 (generated automatically)\n"]
     if part in ("a", "all"):
         part_a(lines)
     if part in ("b", "all"):
         part_b(lines)
     if part == "all":
         OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"已写入 {OUT}")
+        print(f"written to {OUT}")
     print("\n".join(lines))
 
 

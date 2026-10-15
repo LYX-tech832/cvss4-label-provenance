@@ -1,6 +1,6 @@
-# 标签来源体检（全时段；同来源 v3.1/v4.0 对 ≥ 100 的来源）
+# Label provenance audit (all periods; sources with at least 100 same-source v3.1/v4.0 pairs)
 
-| 来源 | v4 总数 | 对数 | 不同 v3.1 向量数 | R（UI:R→P，S:C 照抄） | UI:R→A | 后续影响恒为 N | UI:R→A 且后续恒 N | FD_in | **FD_oos** | 确定-AT | 确定-UI | 确定-SC | 确定-SI | 确定-SA |
+| Source | v4 labels | Pairs | Distinct v3.1 vectors | R (UI:R→P, S:C copied) | UI:R→A | subsequent impacts always N | UI:R→A and subsequent always N | FD_in | **FD_oos** | det-AT | det-UI | det-SC | det-SI | det-SA |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | VulDB | 12,882 | 12,882 | 140 | 96.5% | 84.6% | 95.3% | 83.4% | 96.5% | **99.5%** | 100.0% | 96.5% | 100.0% | 100.0% | 100.0% |
 | VulnCheck | 7,429 | 6,304 | 431 | 67.7% | 62.1% | 61.0% | 57.6% | 74.9% | **74.6%** | 93.3% | 91.2% | 97.9% | 98.0% | 98.7% |
@@ -17,24 +17,24 @@
 | jpcert | 434 | 128 | 40 | 50.0% | 74.2% | 49.2% | 73.4% | 89.8% | **71.8%** | 100.0% | 96.1% | 100.0% | 100.0% | 100.0% |
 | CERTVDE | 107 | 103 | 25 | 92.2% | 91.3% | 92.2% | 91.3% | 97.1% | **77.4%** | 98.1% | 100.0% | 100.0% | 100.0% | 100.0% |
 
-## 来源分型（只用 2026-01-01 之前的数据；阈值 FD_oos ≥ 90% 判为 derived）
+## Source typing (data before 2026-01-01 only; FD_oos ≥ 90% means derived)
 
-- **derived**：VulDB（93.0%）
-- **independent**：VulnCheck（40.8%），siemens（77.1%），icscert（66.1%），intel（47.7%），juniper（51.7%），ABB（37.5%），twcert（83.3%）
-- **v4_only**：GitHub_M（n=1529），INCIBE（n=369），CERT-PL（n=204），qnap（n=186），Liferay（n=145），palo_alto（n=103）
+- **derived**: VulDB (93.0%)
+- **independent**: VulnCheck (40.8%), siemens (77.1%), icscert (66.1%), intel (47.7%), juniper (51.7%), ABB (37.5%), twcert (83.3%)
+- **v4_only**: GitHub_M (n=1529), INCIBE (n=369), CERT-PL (n=204), qnap (n=186), Liferay (n=145), palo_alto (n=103)
 
-全部 v4 标签中各类型占比（按上面的分型）：derived 33.9%，independent 26.7%，v4_only 17.9%，未分型（小来源）21.5%
+Share of each type among all v4 labels (typing above): derived 33.9%, independent 26.7%, v4_only 17.9%, untyped (small sources) 21.5%
 
-阈值敏感性（被判为 derived 的来源）：≥80%：VulDB、twcert；≥90%：VulDB；≥95%：无
+Threshold sensitivity (sources typed as derived): ≥80%: VulDB, twcert; ≥90%: VulDB; ≥95%: none
 
-## 主要来源按季度的规则 R 整向量命中率
+## Quarterly exact-vector hit rate of rule R for the main sources
 
-- siemens：2024Q2 50%（n=48），2024Q3 69%（n=78），2024Q4 42%（n=79），2025Q1 53%（n=45），2025Q2 86%（n=127），2025Q3 71%（n=55），2025Q4 70%（n=46），2026Q2 61%（n=31），2026Q3 50%（n=40）
-- VulDB：2024Q2 75%（n=373），2024Q3 80%（n=698），2024Q4 80%（n=718），2025Q1 93%（n=948），2025Q2 100%（n=1891），2025Q3 100%（n=1885），2025Q4 100%（n=1175），2026Q1 100%（n=1425），2026Q2 100%（n=1894），2026Q3 100%（n=1832）
-- icscert：2024Q3 68%（n=60），2024Q4 86%（n=37），2025Q1 63%（n=60），2025Q2 73%（n=82），2025Q3 68%（n=65），2025Q4 58%（n=72），2026Q1 93%（n=82），2026Q2 68%（n=80），2026Q3 79%（n=165）
-- VulnCheck：2025Q4 40%（n=235），2026Q1 54%（n=1464），2026Q2 67%（n=1643），2026Q3 77%（n=2961）
+- siemens: 2024Q2 50% (n=48), 2024Q3 69% (n=78), 2024Q4 42% (n=79), 2025Q1 53% (n=45), 2025Q2 86% (n=127), 2025Q3 71% (n=55), 2025Q4 70% (n=46), 2026Q2 61% (n=31), 2026Q3 50% (n=40)
+- VulDB: 2024Q2 75% (n=373), 2024Q3 80% (n=698), 2024Q4 80% (n=718), 2025Q1 93% (n=948), 2025Q2 100% (n=1891), 2025Q3 100% (n=1885), 2025Q4 100% (n=1175), 2026Q1 100% (n=1425), 2026Q2 100% (n=1894), 2026Q3 100% (n=1832)
+- icscert: 2024Q3 68% (n=60), 2024Q4 86% (n=37), 2025Q1 63% (n=60), 2025Q2 73% (n=82), 2025Q3 68% (n=65), 2025Q4 58% (n=72), 2026Q1 93% (n=82), 2026Q2 68% (n=80), 2026Q3 79% (n=165)
+- VulnCheck: 2025Q4 40% (n=235), 2026Q1 54% (n=1464), 2026Q2 67% (n=1643), 2026Q3 77% (n=2961)
 
-## 有效标签估计
+## Labels that carry information beyond the v3.1 vector
 
-- v4 标签总数 37,997；其中只给 v4（无同来源 v3.1）14,524；同来源对 23,473，其中与规则 R 完全一致 19,083（81.3%）
-- 与 R(v3.1) 不一致或没有 v3.1 的标签（「携带 v3.1 之外信息」的上界）：18,914（占 49.8%）
+- v4 labels in total 37,997; of these, v4 only (no same-source v3.1) 14,524; same-source pairs 23,473, of which identical to rule R 19,083 (81.3%)
+- Labels that differ from R(v3.1) or have no v3.1 vector (upper bound of the labels that carry information beyond the v3.1 vector): 18,914 (49.8%)

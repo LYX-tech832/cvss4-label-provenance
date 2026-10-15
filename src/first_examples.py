@@ -1,13 +1,14 @@
-"""用 FIRST 官方的 CVSS v4.0 示例作为独立的参照，检验规则 R（CPU，几秒）。
+"""Rule R checked against FIRST's official CVSS v4.0 examples as an independent reference (CPU, seconds).
 
-FIRST 的示例文档（https://www.first.org/cvss/v4.0/examples，文档版本 1.8，2026-10-03 访问）给出了若干漏洞
-由 FIRST CVSS 特别兴趣组评定的 v3.x 向量和 v4.0 向量。这里把规则 R 用在 FIRST 的 v3.x 向量上，
-看它能否得到 FIRST 自己给出的 v4.0 基础向量。样本很小、且是为说明新指标而挑选的，只作描述性的参照。
+FIRST's examples document (https://www.first.org/cvss/v4.0/examples, document version 1.8, accessed 3 October 2026) gives, for a number
+of vulnerabilities, the v3.x and v4.0 vectors assessed by the FIRST CVSS Special Interest Group. This script applies rule R to FIRST's
+v3.x vectors and checks whether it yields FIRST's own v4.0 base vector. The sample is small and was chosen to illustrate the new
+metrics, so it serves only as a descriptive reference.
 
-用法：
-  python src/first_examples.py                      # 读 data/external/first_v4_examples.csv
-  python src/first_examples.py --html 保存的页面.html  # 从保存的页面重新生成这个 csv（每个示例取第一个 v3.x 向量和第一个 v4.0 向量）
-输出：results/review_checks/summary11.md
+Usage:
+  python src/first_examples.py                       # reads data/external/first_v4_examples.csv
+  python src/first_examples.py --html saved_page.html  # rebuilds this csv from the saved page (first v3.x and first v4.0 vector of each example)
+Output: results/review_checks/summary11.md
 """
 
 import argparse
@@ -58,7 +59,7 @@ def band(vec):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--html", help="保存的 FIRST 示例页面；给出时重新生成 csv")
+    ap.add_argument("--html", help="saved FIRST examples page; if given, the csv is rebuilt")
     args = ap.parse_args()
     if args.html:
         CSV.parent.mkdir(parents=True, exist_ok=True)
@@ -71,27 +72,27 @@ def main():
     df["exact"] = df["r_base"] == df["v4_base"]
     df["band_true"], df["band_r"] = df["v4_base"].map(band), df["r_base"].map(band)
     df["cmp"] = [order.index(r) - order.index(t) for r, t in zip(df["band_r"], df["band_true"])]
-    lines = ["# FIRST 官方 v4.0 示例上的规则 R（自动生成）\n",
-             f"FIRST 示例文档 1.8 版中同时给出 v3.x 向量和 v4.0 向量的示例：{len(df)} 个（其中 v3.0 向量 {int((df['v3_version'] == '3.0').sum())} 个）。"
-             "每个示例取第一个 v3.x 向量和第一个 v4.0 向量（后面的向量是文档讨论的变体场景）。\n",
-             "| 范围 | n | 规则 R 得到完全相同的向量 | 严重性等级相同 | 规则 R 的等级更低 / 更高 |", "|---|---|---|---|---|"]
-    for name, m in [("全部示例", df["section"] != ""), ("不含\"新指标\"一节", df["section"] != "new_metric"), ("\"新指标\"一节", df["section"] == "new_metric")]:
+    lines = ["# Rule R on FIRST's official v4.0 examples (generated automatically)\n",
+             f"Examples in version 1.8 of FIRST's examples document with both a v3.x and a v4.0 vector: {len(df)} (of which {int((df['v3_version'] == '3.0').sum())} with a v3.0 vector). "
+             "The first v3.x and the first v4.0 vector of each example are used (later vectors are variant scenarios discussed in the document).\n",
+             "| Scope | n | Rule R gives the identical vector | Same severity band | Rule R's band lower / higher |", "|---|---|---|---|---|"]
+    for name, m in [("all examples", df["section"] != ""), ("without the \"new metrics\" section", df["section"] != "new_metric"), ("\"new metrics\" section", df["section"] == "new_metric")]:
         d = df[m]
-        lines.append(f"| {name} | {len(d)} | {int(d['exact'].sum())}（{d['exact'].mean():.1%}） | {int((d['cmp'] == 0).sum())}（{(d['cmp'] == 0).mean():.1%}） | {int((d['cmp'] < 0).sum())} / {int((d['cmp'] > 0).sum())} |")
-    lines += ["\n## 逐指标：规则 R 与 FIRST 的 v4.0 向量一致的示例数\n", "| " + " | ".join(M40) + " |", "|" + "---|" * len(M40),
-              "| " + " | ".join(str(sum(c[k] == t[k] for c, t in zip(conv, true))) for k in M40) + f" |\n\n（共 {len(df)} 个示例。）"]
+        lines.append(f"| {name} | {len(d)} | {int(d['exact'].sum())} ({d['exact'].mean():.1%}) | {int((d['cmp'] == 0).sum())} ({(d['cmp'] == 0).mean():.1%}) | {int((d['cmp'] < 0).sum())} / {int((d['cmp'] > 0).sum())} |")
+    lines += ["\n## Per metric: examples where rule R agrees with FIRST's v4.0 vector\n", "| " + " | ".join(M40) + " |", "|" + "---|" * len(M40),
+              "| " + " | ".join(str(sum(c[k] == t[k] for c, t in zip(conv, true))) for k in M40) + f" |\n\n({len(df)} examples in total.)"]
     at = sum(t["AT"] == "P" for t in true)
     ua = sum(t["UI"] == "A" for t in true)
-    lines += ["\n## 规则 R 无法产生的取值\n",
-              f"FIRST 的 v4.0 向量中 AT:P 有 {at} 个（{at / len(df):.1%}），UI:A 有 {ua} 个（{ua / len(df):.1%}）；"
-              f"至少含其中之一的示例 {sum(t['AT'] == 'P' or t['UI'] == 'A' for t in true)} 个。",
-              f"规则 R 把 AC 原样保留；FIRST 把 v3.x 的 AC:H 改为 AC:L 的示例：{sum(c['AC'] == 'H' and t['AC'] == 'L' for c, t in zip(conv, true))} 个"
-              f"（v3.x 为 AC:H 的共 {sum(c['AC'] == 'H' for c in conv)} 个）。",
-              f"v3.x 为 S:C 的示例 {sum('S:C' in v for v in df['v3_base'])} 个，其中规则 R 的 VC/VI/VA/SC/SI/SA 六项与 FIRST 全部一致的："
-              f"{sum('S:C' in v and all(c[k] == t[k] for k in ['VC', 'VI', 'VA', 'SC', 'SI', 'SA']) for v, c, t in zip(df['v3_base'], conv, true))} 个。",
-              "\n## 明细\n", "| CVE | 节 | v3.x 向量 | FIRST 的 v4.0 向量 | 规则 R | 相同 | 等级（FIRST / 规则 R） |", "|---|---|---|---|---|---|---|"]
+    lines += ["\n## Values that rule R cannot produce\n",
+              f"FIRST's v4.0 vectors contain AT:P in {at} examples ({at / len(df):.1%}) and UI:A in {ua} ({ua / len(df):.1%}); "
+              f"examples with at least one of them: {sum(t['AT'] == 'P' or t['UI'] == 'A' for t in true)}.",
+              f"Rule R keeps AC unchanged; examples where FIRST changes v3.x AC:H to AC:L: {sum(c['AC'] == 'H' and t['AC'] == 'L' for c, t in zip(conv, true))} "
+              f"(of {sum(c['AC'] == 'H' for c in conv)} with AC:H in v3.x).",
+              f"Examples with S:C in v3.x: {sum('S:C' in v for v in df['v3_base'])}; of these, examples where rule R agrees with FIRST on all six of VC/VI/VA/SC/SI/SA: "
+              f"{sum('S:C' in v and all(c[k] == t[k] for k in ['VC', 'VI', 'VA', 'SC', 'SI', 'SA']) for v, c, t in zip(df['v3_base'], conv, true))}.",
+              "\n## Details\n", "| CVE | Section | v3.x vector | FIRST's v4.0 vector | Rule R | Identical | Band (FIRST / rule R) |", "|---|---|---|---|---|---|---|"]
     for _, r in df.iterrows():
-        lines.append(f"| {r['cve_id']} | {r['section']} | {r['v3_base']} | {r['v4_base']} | {r['r_base']} | {'是' if r['exact'] else '否'} | {r['band_true']} / {r['band_r']} |")
+        lines.append(f"| {r['cve_id']} | {r['section']} | {r['v3_base']} | {r['v4_base']} | {r['r_base']} | {'yes' if r['exact'] else 'no'} | {r['band_true']} / {r['band_r']} |")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines[:22]))
 

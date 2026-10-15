@@ -1,9 +1,8 @@
-"""补充的一项核对（10-12；CPU，几秒；只读 probe/nvd_v4_records.jsonl 和处理好的 CVE 记录）。
+"""CVEs with a v4.0 vector assigned by the NVD itself (CPU, seconds; reads only probe/nvd_v4_records.jsonl and the processed CVE records).
 
-论文 8.2 节原来写"no independent v4.0 assessment of these CVEs exists"（这些 CVE 指有 NVD 自评 v3.1 向量的
-v4.0 标注 CVE，共 16,250 个）。NVD 记录里其实有极少数 CVE 带 NVD 自己给的 v4.0 向量（source = nvd@nist.gov）。
-这里把它们列出来，并标明是否在我们的 v4.0 数据集里、是否属于那 16,250 个。
-输出：results/review_checks/summary21.md
+A few NVD records carry a v4.0 vector assigned by the NVD itself (source = nvd@nist.gov). This script lists these CVEs and marks
+whether each one is in our v4.0 dataset and whether it belongs to the 16,250 v4.0-labelled CVEs with an NVD-assigned v3.1 vector.
+Output: results/review_checks/summary21.md
 """
 
 import json
@@ -31,11 +30,11 @@ def main():
             n += 1
             if any(e[0] == NVD for e in (r.get("v40") or [])):
                 rows.append((r["id"], r["published"][:10], ours.get(r["id"], "—"), r["id"] in ours and r["id"] in nvd31))
-    lines = ["# NVD 自己给出 v4.0 向量的 CVE（自动生成）\n",
-             f"NVD 记录 {n:,} 条；v4.0 数据集中有 NVD 自评 v3.1 向量的 CVE {both:,} 个。\n",
-             "| CVE | 发布日期 | 在 v4.0 数据集中的 CNA | 属于有 NVD v3.1 的那批 |", "|---|---|---|---|"]
-    lines += [f"| {c} | {d} | {s} | {'是' if b else '否'} |" for c, d, s, b in rows]
-    lines.append(f"\n共 {len(rows)} 个，其中属于有 NVD v3.1 的那批的 {sum(b for *_, b in rows)} 个。")
+    lines = ["# CVEs with a v4.0 vector assigned by the NVD itself (generated automatically)\n",
+             f"NVD records: {n:,}; CVEs of the v4.0 dataset with an NVD-assigned v3.1 vector: {both:,}.\n",
+             "| CVE | Published | CNA in the v4.0 dataset | In that set |", "|---|---|---|---|"]
+    lines += [f"| {c} | {d} | {s} | {'yes' if b else 'no'} |" for c, d, s, b in rows]
+    lines.append(f"\n{len(rows)} CVEs in total, {sum(b for *_, b in rows)} of them in that set.")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 

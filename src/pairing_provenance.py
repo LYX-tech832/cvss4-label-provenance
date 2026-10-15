@@ -1,12 +1,12 @@
-"""配对来源分析：把 v3.1 换算成 v4.0 时，"用谁的 v3.1"会在多大程度上决定评测结果？
+"""Pairing provenance: when v3.1 is converted to v4.0, how much does "whose v3.1 vector is used" determine the evaluation result?
 
-背景：Vieira et al., Internet of Things 39 (2026) 102038 在"NVD 中两版都有官方评分的 CVE"（D4，25,437 条，
-快照 2026-07-12）上评测 v3.x→v4.0 转换，但没有说明用的是 NVD 自评的 v3.x 还是 CNA 的 v3.x。
-本脚本用 NVD API 扫描数据（probe/nvd_v4_records.jsonl）近似重建 D4，并用同一条规则 R 比较：
-  跨来源配对：NVD 的 v3.1 ↔ CNA 的 v4.0
-  同来源配对：CNA 的 v3.1 ↔ 同一个 CNA 的 v4.0
-  严格配对：同一批 CVE 同时有 NVD v3.1 与 CNA v3.1，只换 v3.1 的来源
-输出：results/pairing_provenance/summary.md
+Vieira et al., Internet of Things 39 (2026) 102038 evaluate the v3.x -> v4.0 conversion on "CVEs with official scores of both versions
+in the NVD" (D4, 25,437 CVEs, snapshot of 2026-07-12), but do not state whether the v3.x vector is the NVD's own or the CNA's.
+This script approximately rebuilds D4 from the NVD API scan (probe/nvd_v4_records.jsonl) and compares, with the same rule R:
+  cross-source pairing: the NVD's v3.1 <-> the CNA's v4.0
+  same-source pairing:  the CNA's v3.1 <-> the same CNA's v4.0
+  strict pairing:       the same CVEs with both an NVD v3.1 and a CNA v3.1 vector; only the source of the v3.1 vector changes
+Output: results/pairing_provenance/summary.md
 """
 
 import collections
@@ -43,9 +43,9 @@ def convert(v31):
 def main():
     recs = [json.loads(line) for line in io.open(ROOT / "probe" / "nvd_v4_records.jsonl", encoding="utf-8")]
     d4 = [r for r in recs if START <= r["published"][:10] <= END and r["v31"] and r["v40"]]
-    lines = [f"# 配对来源分析（近似 Vieira 2026 的 D4：{START} 至 {END} 发布、同时有 v3.1 与 v4.0，共 {len(d4):,} 条）\n"]
+    lines = [f"# Pairing provenance (approximation of D4 of Vieira et al. 2026: published from {START} to {END}, with both v3.1 and v4.0, {len(d4):,} CVEs)\n"]
     src = collections.Counter(r["v40"][0][0] for r in d4)
-    lines.append("v4.0 标签来源前 5：" + "；".join(f"{s} {n:,}（{n / len(d4):.1%}）" for s, n in src.most_common(5)) + "\n")
+    lines.append("Top 5 sources of the v4.0 labels: " + "; ".join(f"{s} {n:,} ({n / len(d4):.1%})" for s, n in src.most_common(5)) + "\n")
 
     def evaluate(rows, pick_v31):
         c = collections.Counter()
@@ -69,15 +69,15 @@ def main():
     cna_v31 = lambda r: by_src(r).get(r["v40"][0][0])  # noqa: E731
     paired = [r for r in d4 if nvd_v31(r) and cna_v31(r)]
     rows = [
-        ("跨来源（NVD v3.1 ↔ CNA v4.0），全部可用", d4, nvd_v31),
-        ("同来源（CNA v3.1 ↔ CNA v4.0），全部可用", d4, cna_v31),
-        ("同来源，去掉 VulDB", [r for r in d4 if r["v40"][0][0] != VULDB], cna_v31),
-        ("严格配对 · 用 NVD 的 v3.1", paired, nvd_v31),
-        ("严格配对 · 用 CNA 的 v3.1", paired, cna_v31),
-        ("严格配对去掉 VulDB · 用 NVD 的 v3.1", [r for r in paired if r["v40"][0][0] != VULDB], nvd_v31),
-        ("严格配对去掉 VulDB · 用 CNA 的 v3.1", [r for r in paired if r["v40"][0][0] != VULDB], cna_v31),
+        ("cross-source (NVD v3.1 ↔ CNA v4.0), all available", d4, nvd_v31),
+        ("same-source (CNA v3.1 ↔ CNA v4.0), all available", d4, cna_v31),
+        ("same-source, without VulDB", [r for r in d4 if r["v40"][0][0] != VULDB], cna_v31),
+        ("strict pairing · NVD's v3.1", paired, nvd_v31),
+        ("strict pairing · CNA's v3.1", paired, cna_v31),
+        ("strict pairing without VulDB · NVD's v3.1", [r for r in paired if r["v40"][0][0] != VULDB], nvd_v31),
+        ("strict pairing without VulDB · CNA's v3.1", [r for r in paired if r["v40"][0][0] != VULDB], cna_v31),
     ]
-    lines += ["| 设定 | n | 其中 VulDB | 规则 R 等级准确率 | 低估率 | 整向量全对 |", "|---|---|---|---|---|---|"]
+    lines += ["| Setting | n | Of which VulDB | Rule-R band accuracy | Underestimation | Exact vector |", "|---|---|---|---|---|---|"]
     for name, subset, pick in rows:
         c = evaluate(subset, pick)
         n = c["n"]
@@ -90,8 +90,8 @@ def main():
             same += a == b
             for k in a:
                 agree[k] += a[k] == b[k]
-    lines.append(f"\n严格配对的 {len(paired):,} 条 CVE 上，NVD 与 CNA 的 v3.1 向量完全相同 {same / len(paired):.1%}；逐指标一致率："
-                 + "，".join(f"{k} {v / len(paired):.1%}" for k, v in agree.items()))
+    lines.append(f"\nOn the {len(paired):,} strictly paired CVEs, the NVD's and the CNA's v3.1 vectors are identical for {same / len(paired):.1%}; per-metric agreement: "
+                 + ", ".join(f"{k} {v / len(paired):.1%}" for k, v in agree.items()))
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "summary.md").write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))

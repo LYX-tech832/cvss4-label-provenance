@@ -1,14 +1,16 @@
-"""流水线基线（CPU）：描述 → v3.1（文本分类）→ v4.0（规则换算）。仿照 Vieira et al., IoT 39 (2026) 102038 的思路。
+"""Pipeline baseline (CPU): description -> v3.1 (text classification) -> v4.0 (rule-based conversion), following the idea of
+Vieira et al., IoT 39 (2026) 102038.
 
-注意：这条路线完全不使用 v4.0 标签，只用"只有 v3.1 标签"的 CVE 训练阶段 1。
-阶段 1：TF-IDF + LR，训练集 = 只有 v3.1、没有 CNA v4.0 的 CVE
-        （时间划分：只取 2026 年前发布的；留一来源：去掉被留出来源的 CVE）
-阶段 2：两种换算规则
-        rule_R          我们的规则 R：AV/AC/PR 照抄，AT=N，UI: N→N、R→P，VC/VI/VA=C/I/A，S:C 时 SC/SI/SA 照抄 C/I/A
-        vieira_like     与 R 相同，但 SC/SI/SA 一律为 N（Vieira 2026 原文说明其确定性映射把这三项设为 N）
-        ⚠️ Vieira 的流水线后续还有基于候选分数的 ML 等级选择，只输出严重性等级，无法按向量复现，所以这里只是"近似"
-评测：与 T2 相同的测试集，报告全部、去掉 derived、按标签类型三种口径
-输出：results/pipeline_baseline/summary.md、metrics.json
+This route uses no v4.0 labels at all; stage 1 is trained only on CVEs that have v3.1 labels only.
+Stage 1: TF-IDF + LR, trained on the CVEs with a v3.1 vector and no CNA-provided v4.0 vector
+         (temporal split: only those published before 2026; leave-one-source-out: without the CVEs of the held-out source)
+Stage 2: two conversion rules
+         rule_R          our rule R: AV/AC/PR copied, AT=N, UI: N->N, R->P, VC/VI/VA = C/I/A, SC/SI/SA copied from C/I/A when S:C
+         vieira_like     as R, but SC/SI/SA always N (Vieira et al. state that their deterministic mapping sets these three to N)
+         Vieira et al.'s pipeline then selects the severity band with a learned model on candidate scores and outputs only the band,
+         which cannot be reproduced vector by vector, so this is an approximation.
+Evaluation: the same test sets as T2, reported on all labels, without derived labels, and by label type
+Output: results/pipeline_baseline/summary.md, metrics.json
 """
 
 import json
@@ -36,7 +38,7 @@ def stage1(pool, texts):
     out = {}
     for k in M31:
         out[k] = LogisticRegression(C=4.0, max_iter=3000, random_state=SEED).fit(x, pool["z_" + k].values).predict(xq)
-        print("  阶段 1 完成指标", k, flush=True)
+        print("  stage 1 done for metric", k, flush=True)
     return pd.DataFrame(out)
 
 
@@ -73,18 +75,18 @@ def main():
             test = df[df["source"] == s].reset_index(drop=True)
             pool = v31_pool(before_cutoff=False)
             pool = pool[pool["cna_short_name"].fillna("UNKNOWN") != s]
-        print(f"== {split}: 阶段 1 训练 {len(pool):,} 条，测试 {len(test):,} 条", flush=True)
+        print(f"== {split}: stage 1 trained on {len(pool):,} CVEs, {len(test):,} test CVEs", flush=True)
         v31_pred = stage1(pool, list(test["text"]))
         results[split] = {"n_pool": len(pool), "n_test": len(test)}
         for name, sub in [("rule_R", True), ("vieira_like", False)]:
             results[split][name] = report(test, convert(v31_pred, sub))
             a = results[split][name]["all"]
-            print(f"  {name}: 平均F1 {a['mean_macro_f1']:.3f} 全对 {a['exact_match']:.3f} 等级准确率 {a['band_acc']:.3f} 低估率 {a['under_rate']:.3f}", flush=True)
+            print(f"  {name}: mean F1 {a['mean_macro_f1']:.3f} exact {a['exact_match']:.3f} band accuracy {a['band_acc']:.3f} underestimation {a['under_rate']:.3f}", flush=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "metrics.json").write_text(json.dumps(results, indent=1, ensure_ascii=False), encoding="utf-8")
-    lines = ["# 流水线基线：描述 → v3.1（TF-IDF+LR）→ v4.0（规则换算）；不使用任何 v4.0 标签\n",
-             "单元格 = 平均F1 / 全对 / 等级准确率 / 低估率\n",
-             "| 划分 | 换算 | 全部 | 去掉 derived | independent | v4_only | other |", "|---|---|---|---|---|---|---|"]
+    lines = ["# Pipeline baseline: description -> v3.1 (TF-IDF+LR) -> v4.0 (rule-based conversion); no v4.0 labels used\n",
+             "Cell = mean F1 / exact / band accuracy / underestimation rate\n",
+             "| Split | Conversion | All | Without derived | independent | v4_only | other |", "|---|---|---|---|---|---|---|"]
     for split, r in results.items():
         for name in ["rule_R", "vieira_like"]:
             cells = []

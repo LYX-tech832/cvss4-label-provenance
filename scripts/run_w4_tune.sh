@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# W4 第一步：在验证集上调参（T2 时间划分，种子 0，统一训练 5 轮，按验证集选最佳轮次）。
-#   无辅助：类别加权 {无, inv_sqrt}                 → 2 次
-#   有辅助：λ {0.5, 1.0} × 类别加权 {无, inv_sqrt}    → 4 次
-# 跑完后运行：python src/select_config.py   （只看验证集，为两个版本各选一个配置）
-# 支持中断后续跑（已有结果的运行会跳过）。
+# W4, step 1: tuning on the validation set (T2 temporal split, seed 0, always 5 epochs, best epoch selected on the validation set).
+#   baseline:  class weighting {none, inv_sqrt}                  -> 2 runs
+#   auxiliary: λ {0.5, 1.0} × class weighting {none, inv_sqrt}   -> 4 runs
+# Afterwards run: python src/select_config.py   (validation set only; one configuration per variant)
+# Resumable after an interruption (runs with results are skipped).
 set -e
 cd "$(dirname "$0")/.."
 MODEL=${MODEL:-microsoft/deberta-v3-base}

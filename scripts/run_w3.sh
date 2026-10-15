@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# W3 第一批 GPU 实验（计划 v2）：DeBERTa-v3-base，1 个随机种子。
-#   主实验：T2（只有描述）× {时间划分, 留一 VulnCheck, 留一 GitHub_M, 留一 VulDB} × {基础, +v3.1 辅助任务（贡献 3）} = 8 次
-#   对照：  T1 时间划分 × 基础 = 1 次
-#   分析：  T2 时间划分 × {来源特征, 来源习惯矩阵} = 2 次（贡献 2' 已降级为分析，这两次只用于论文中的分析小节）
-# 用法（在项目根目录）：bash scripts/run_w3.sh
-# 换模型：MODEL=answerdotai/ModernBERT-base bash scripts/run_w3.sh；换种子：SEED=1 bash scripts/run_w3.sh
+# W3, first batch of GPU runs: DeBERTa-v3-base, one random seed.
+#   Main runs: T2 (description only) × {temporal, leave out VulnCheck, leave out GitHub_M, leave out VulDB} × {plain, + v3.1 auxiliary task} = 8 runs
+#   Control:   T1 temporal × plain = 1 run
+#   Analysis:  T2 temporal × {source features, source habit matrices} = 2 runs
+# Usage (from the project root): bash scripts/run_w3.sh
+# Other model: MODEL=answerdotai/ModernBERT-base bash scripts/run_w3.sh; other seed: SEED=1 bash scripts/run_w3.sh
 set -e
 cd "$(dirname "$0")/.."
 MODEL=${MODEL:-microsoft/deberta-v3-base}

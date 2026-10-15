@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# W4 第二步：多种子主实验。每个（划分 × 种子）各跑"无辅助"和"有辅助"两个版本，配置来自 select_config.py。
-# 用法（在项目根目录）：
+# W4, step 2: multi-seed main runs. For each (split × seed), runs the baseline and the auxiliary variant, with configurations from select_config.py.
+# Usage (from the project root):
 #   NONE_ARGS="--epochs 5 --class_weight none" AUX_ARGS="--epochs 5 --class_weight none --aux_v31 --aux_lambda 0.5" \
 #   SEEDS="0 1 2 3 4" bash scripts/run_w4_seeds.sh
-# 支持中断后续跑（已有结果的运行会跳过）。跑完后：python src/aggregate_seeds.py --config_none ... --config_aux ... --lam ...
+# Resumable after an interruption (runs with results are skipped). Afterwards: python src/aggregate_seeds.py --config_none ... --config_aux ... --lam ...
 set -e
 cd "$(dirname "$0")/.."
 : "${NONE_ARGS:?需要设置 NONE_ARGS}"

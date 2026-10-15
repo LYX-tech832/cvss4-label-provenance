@@ -1,10 +1,12 @@
-"""图 2：来源感知评测协议示意图（纯作图，数字来自已核实的结果：第 4.1 节表 3、第 5.2 节表 5）。
+"""Figure 1: diagram of the provenance-aware evaluation protocol (drawing only; the numbers come from verified results in Sections 4.1
+and 5.2).
 
-四步：1 数据 → 2 来源分型（只用 2026 年以前的数据）→ 3 划分（时间划分 + 留一来源）→ 4 报告（按标签类型；指标；选模型与统计）。
-颜色与图 1 一致：derived = VulDB 的橙色，undetected（未检出达到阈值的依赖）= VulnCheck 的蓝色。
-10-02 修改：原图按 7.2 英寸画、排版时缩到正文宽度 5.4 英寸，字只有约 5 pt；
-改为按正文宽度 1:1 作图的 2×2 布局（字号 7–9 pt），样本池在图内分别写明时间划分与留一来源的口径。
-输出：paper/figures/fig2_protocol.pdf、.png，并同步到 paper/latex/figures/（LaTeX 编译实际用这一份）。
+Four steps: 1 data -> 2 source typing (data before 2026 only) -> 3 splits (temporal + leave-one-source-out) -> 4 reporting (by label
+type; metrics; model selection and statistics).
+Colours as in Figure S2: derived = VulDB's orange, undetected (no dependence above the threshold detected) = VulnCheck's blue.
+Drawn at text width 1:1 in a 2×2 layout (font size 7-9 pt); the sample pools state the definitions for the temporal and the
+leave-one-source-out splits.
+Output: paper/figures/fig2_protocol.pdf, .png, copied to paper/latex/figures/ (the copy used by the LaTeX build).
 """
 
 import shutil

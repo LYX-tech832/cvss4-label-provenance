@@ -1,25 +1,28 @@
-"""AutoCVSS 零样本基线的外部驱动脚本（W4）。
+"""External driver of the AutoCVSS zero-shot baseline (W4).
 
-本文件是我们自己写的代码：只 import 并原样调用 AutoCVSS 的函数，不修改 AutoCVSS 的任何文件
-（AutoCVSS 许可证规定：修改或衍生归 NEC 所有、不得分发；论文中须致谢 NEC Laboratories Europe）。
-复用的 AutoCVSS 函数：
-  zero_shot_STD_DTD_cvss_v40.classify_description / get_label_from_raw_output   —— 逐指标零样本分类
-  eval_utils.postprocess_v40_prediction   —— "DONT_KNOW"或调用失败时取最保守标签（与原论文一致）
-  cvss_v40_metrics.utils.makeCVSS40VectorString   —— 长标签 → 向量字符串
+This file is our own code: it only imports and calls AutoCVSS's functions unchanged and modifies none of AutoCVSS's files
+(the AutoCVSS licence assigns modifications and derivative works to NEC and forbids their distribution; papers must acknowledge
+NEC Laboratories Europe).
+AutoCVSS functions used:
+  zero_shot_STD_DTD_cvss_v40.classify_description / get_label_from_raw_output   -- zero-shot classification of each metric
+  eval_utils.postprocess_v40_prediction   -- the most conservative label for "DONT_KNOW" or a failed request (as in the original paper)
+  cvss_v40_metrics.utils.makeCVSS40VectorString   -- long labels -> vector string
 
-LLM 端点：任何 OpenAI 兼容接口（本地 vLLM，或托管 API）。
-  地址用 --base_url 或环境变量 OPENAI_BASE_URL；密钥只从环境变量 OPENAI_API_KEY 读取（本地 vLLM 可不设）。
-  不要把密钥写在命令行或代码里。
+LLM endpoint: any OpenAI-compatible API (local vLLM or a hosted API).
+  The address comes from --base_url or the environment variable OPENAI_BASE_URL; the key is read from the environment variable
+  OPENAI_API_KEY or, if that is not set, from the text file given by --api_key_file (not needed for a local vLLM).
+  Do not put the key on the command line or in code.
 
-测试集：2026 年发布的 T2 测试集（与 baselines_v0 相同），按标签类型分层抽样（默认共 2,000 条），
-每条 11 次调用；原始输出（含每次调用的 token 用量）逐条追加写入 raw.jsonl，中断后重跑会自动跳过已完成的调用。
-DeepSeek V4 默认开启思考模式；本脚本默认用 --thinking disabled 关闭它（对应 AutoCVSS 的无 CoT 设置）。
-思考模式的开关通过我们自己创建的 OpenAI 客户端附加到每次请求上，AutoCVSS 的代码不做任何改动。
+Test set: the T2 test set of CVEs published in 2026 (as in baselines_v0), stratified by label type (2,000 CVEs by default), 11 requests
+per CVE; the raw outputs (with the token usage of each request) are appended to raw.jsonl one by one, and a rerun after an interruption
+skips the finished requests. DeepSeek V4 enables thinking mode by default; this script disables it by default with --thinking disabled
+(matching AutoCVSS's setting without CoT). The thinking switch is attached to every request through an OpenAI client created by us;
+AutoCVSS's code is not changed.
 
-用法（在项目根目录）：
-  python src/run_autocvss_baseline.py --model <服务端模型名> --smoke_test     # 先用 3 条 CVE 试通
-  python src/run_autocvss_baseline.py --model <服务端模型名> --prompt DTD
-  DeepSeek 示例：--base_url https://api.deepseek.com --model deepseek-v4-pro --mode json
+Usage (from the project root):
+  python src/run_autocvss_baseline.py --model <model name on the server> --smoke_test     # first a trial with 3 CVEs
+  python src/run_autocvss_baseline.py --model <model name on the server> --prompt DTD
+  DeepSeek example: --base_url https://api.deepseek.com --model deepseek-v4-pro --mode json
 """
 
 import argparse

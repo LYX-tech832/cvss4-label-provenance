@@ -1,11 +1,15 @@
-"""配置选择、步数相当的基线与时间信息敏感性的 GPU 实验汇总（scripts/run_review_gpu4.sh；CPU，约 20 分钟）。
+"""Summary of the GPU runs for configuration selection, step-matched baselines and timing sensitivity (scripts/run_review_gpu4.sh;
+CPU, about 20 minutes).
 
-1. 配置选择：每个划分只用自己的验证集选出的配置（src/select_loso_config.py）。
-2. 主要比较：每个划分选中的辅助配置 vs 选中的无辅助配置，种子 0–4：表 7 的各项指标（均值 ± 标准差），
-   平均宏 F1 与等级准确率的配对 bootstrap（测试 CVE，模型固定），逐种子差值与 t 区间（训练随机性）。
-3. 时间划分的步数相同基线：辅助 5 轮 vs 无辅助 25 轮（与辅助 5 轮的优化步数相当）与 10 轮。
-4. 时间信息敏感性：去掉容器在截止日期后更新过的 CVE（--exclude_ids）前后，无辅助 10 轮与辅助 5 轮（种子 0–2）。
-输出：results/review_gpu/summary4.md
+1. Configuration selection: each split uses the configuration selected on its own validation set (src/select_loso_config.py).
+2. Main comparison: the selected auxiliary configuration vs the selected baseline configuration of each split, seeds 0-4: the metrics of
+   Table 2 (mean ± standard deviation), paired bootstrap of mean macro-F1 and band accuracy (test CVEs, models fixed), per-seed
+   differences and t intervals (training randomness).
+3. Step-matched baselines on the temporal split: auxiliary 5 epochs vs baseline 25 epochs (as many optimisation steps as auxiliary
+   5 epochs) and 10 epochs.
+4. Timing sensitivity: baseline 10 epochs and auxiliary 5 epochs (seeds 0-2), with and without the CVEs whose containers were updated
+   after the cut-off (--exclude_ids).
+Output: results/review_gpu/summary4.md
 """
 
 import json
@@ -36,7 +40,7 @@ def run_dirs(split, tag, seeds=range(5)):
 
 
 def tag_of(args):
-    """select_loso_config 的参数串 → 运行名后缀。"""
+    """Argument string of select_loso_config -> suffix of the run name."""
     a = args.split()
     lam = a[a.index("--aux_lambda") + 1] if "--aux_lambda" in a else None
     tag = "_aux" if "--aux_v31" in a else ""
@@ -77,7 +81,7 @@ def compare(lines, df, title, dirs_aux, dirs_none, scopes):
     a = {s: dirs_aux[s] for s in common}
     b = {s: dirs_none[s] for s in common}
     boot = paired_bootstrap(df, b, a)
-    lines += [f"\n{title}（共同种子 {common}）\n", "| 口径 | 平均宏 F1 差 [bootstrap] | 等级准确率差 [bootstrap] | 逐种子差值（平均宏 F1） | t 区间 | 为正的种子 |",
+    lines += [f"\n{title} (common seeds {common})\n", "| Scope | Mean macro-F1 difference [bootstrap] | Band accuracy difference [bootstrap] | Per-seed differences (mean macro-F1) | t interval | Positive seeds |",
               "|---|---|---|---|---|---|"]
     for scope in scopes:
         if scope not in boot:
@@ -92,51 +96,51 @@ def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
     sel = select()
-    lines = ["# 配置选择、步数相当的基线与时间信息敏感性的 GPU 实验汇总（自动生成）\n", "## 1. 每个划分按自己的验证集选出的配置（种子 0）\n",
-             "| 划分 | 辅助模型 | 无辅助模型 |", "|---|---|---|"]
+    lines = ["# Configuration selection, step-matched baselines and timing sensitivity (GPU runs; generated automatically)\n", "## 1. Configuration selected on each split's own validation set (seed 0)\n",
+             "| Split | Auxiliary model | Baseline |", "|---|---|---|"]
     chosen = {}
     for sp in SPLITS:
         ta, tn = tag_of(sel[sp]["aux"]["args"]), tag_of(sel[sp]["none"]["args"])
         chosen[sp] = (ta, tn)
-        lines.append(f"| {sp} | `{ta}`（{sel[sp]['aux']['scores'][sel[sp]['aux']['best']]:.4f}） | `{tn}`（{sel[sp]['none']['scores'][sel[sp]['none']['best']]:.4f}） |")
+        lines.append(f"| {sp} | `{ta}` ({sel[sp]['aux']['scores'][sel[sp]['aux']['best']]:.4f}) | `{tn}` ({sel[sp]['none']['scores'][sel[sp]['none']['best']]:.4f}) |")
 
-    lines.append("\n## 2. 选中配置的主要结果（表 7 的口径；均值 ± 标准差，种子 0–4）\n")
+    lines.append("\n## 2. Main results of the selected configurations (as in Table 2; mean ± standard deviation, seeds 0–4)\n")
     for sp in SPLITS:
         ta, tn = chosen[sp]
         da, dn = run_dirs(sp, ta), run_dirs(sp, tn)
         scopes = ["all", "non_derived"] if sp == "temporal" else ["all"]
         for scope in scopes:
-            lines += [f"\n### {sp}，{scope}\n", "| 模型 | 种子数 | " + " | ".join(c for _, c in COLS) + " |", "|---" * (len(COLS) + 2) + "|"]
-            for name, dd in [(f"无辅助 `{tn}`", dn), (f"辅助 `{ta}`", da)]:
+            lines += [f"\n### {sp}, {scope}\n", "| Model | Seeds | " + " | ".join(c for _, c in COLS) + " |", "|---" * (len(COLS) + 2) + "|"]
+            for name, dd in [(f"baseline `{tn}`", dn), (f"auxiliary `{ta}`", da)]:
                 if dd:
                     m = describe(dd, df, scope)
                     lines.append(f"| {name} | {len(dd)} | " + " | ".join(f"{m[k][0]:.3f} ± {m[k][1]:.3f}" for k, _ in COLS) + " |")
-        compare(lines, df, f"{sp}：辅助 − 无辅助（选中配置）", da, dn, scopes)
+        compare(lines, df, f"{sp}: auxiliary − baseline (selected configurations)", da, dn, scopes)
         if sp != "temporal" and (ta != "_aux_e5_cwinv_sqrt" or tn != "_e5_cwinv_sqrt"):
             old_a, old_n = run_dirs(sp, "_aux_e5_cwinv_sqrt"), run_dirs(sp, "_e5_cwinv_sqrt")
-            compare(lines, df, f"{sp}：参照——原配置（时间划分上选的）辅助 − 无辅助", old_a, old_n, ["all"])
+            compare(lines, df, f"{sp}: reference, configuration selected on the temporal split, auxiliary − baseline", old_a, old_n, ["all"])
 
-    lines.append("\n## 3. 时间划分：辅助 5 轮 vs 不同训练长度的无辅助基线\n")
+    lines.append("\n## 3. Temporal split: auxiliary 5 epochs vs baselines trained for different lengths\n")
     aux = run_dirs("temporal", "_aux_e5_cwinv_sqrt")
-    for tn, label in [("_e5_cwinv_sqrt", "5 轮"), ("_e10_cwinv_sqrt", "10 轮"), ("_e25_cwinv_sqrt", "25 轮（优化步数与辅助 5 轮相当）")]:
+    for tn, label in [("_e5_cwinv_sqrt", "5 epochs"), ("_e10_cwinv_sqrt", "10 epochs"), ("_e25_cwinv_sqrt", "25 epochs (as many optimisation steps as auxiliary 5 epochs)")]:
         dn = run_dirs("temporal", tn)
         best = [json.loads((d / "results.json").read_text(encoding="utf-8"))["best_epoch"] + 1 for d in dn.values()]
-        lines.append(f"\n无辅助 {label}：最佳轮次 {best}")
-        compare(lines, df, f"辅助 5 轮 − 无辅助 {label}", aux, dn, ["all", "non_derived"])
+        lines.append(f"\nBaseline {label}: best epoch {best}")
+        compare(lines, df, f"auxiliary 5 epochs − baseline {label}", aux, dn, ["all", "non_derived"])
 
-    lines.append("\n## 4. 时间信息敏感性：去掉容器在截止日期后更新过的 CVE（种子 0–2）\n")
+    lines.append("\n## 4. Timing sensitivity: without the CVEs whose containers were updated after the cut-off (seeds 0–2)\n")
     ex = json.loads((ROOT / "data" / "processed" / "late_updated_ids.json").read_text(encoding="utf-8"))
-    lines.append(f"去掉的 v4 训练/验证样本 {len(ex['v4']):,} 条、辅助样本池 {len(ex['pool']):,} 条；测试集不变。\n")
-    lines += ["| 模型 | 口径 | 全部数据 | 去掉后 |", "|---|---|---|---|"]
-    pairs = {"无辅助 10 轮": ("_e10_cwinv_sqrt", "_e10_cwinv_sqrt_xlate"), "辅助 5 轮": ("_aux_e5_cwinv_sqrt", "_aux_e5_cwinv_sqrt_xlate")}
+    lines.append(f"Removed: {len(ex['v4']):,} v4 training/validation samples and {len(ex['pool']):,} samples of the auxiliary pool; the test set is unchanged.\n")
+    lines += ["| Model | Scope | All data | Without them |", "|---|---|---|---|"]
+    pairs = {"baseline 10 epochs": ("_e10_cwinv_sqrt", "_e10_cwinv_sqrt_xlate"), "auxiliary 5 epochs": ("_aux_e5_cwinv_sqrt", "_aux_e5_cwinv_sqrt_xlate")}
     for name, (full, excl) in pairs.items():
         for scope in ["all", "non_derived"]:
             mf = describe(run_dirs("temporal", full, range(3)), df, scope)
             mx = describe(run_dirs("temporal", excl, range(3)), df, scope)
             lines.append(f"| {name} | {scope} | {mf['mean_macro_f1'][0]:.3f} / {mf['band_acc'][0]:.3f} | {mx['mean_macro_f1'][0]:.3f} / {mx['band_acc'][0]:.3f} |")
-    compare(lines, df, "去掉后：辅助 5 轮 − 无辅助 10 轮", run_dirs("temporal", "_aux_e5_cwinv_sqrt_xlate", range(3)),
+    compare(lines, df, "without them: auxiliary 5 epochs − baseline 10 epochs", run_dirs("temporal", "_aux_e5_cwinv_sqrt_xlate", range(3)),
             run_dirs("temporal", "_e10_cwinv_sqrt_xlate", range(3)), ["all", "non_derived"])
-    compare(lines, df, "参照（全部数据，种子 0–2）：辅助 5 轮 − 无辅助 10 轮", run_dirs("temporal", "_aux_e5_cwinv_sqrt", range(3)),
+    compare(lines, df, "reference (all data, seeds 0–2): auxiliary 5 epochs − baseline 10 epochs", run_dirs("temporal", "_aux_e5_cwinv_sqrt", range(3)),
             run_dirs("temporal", "_e10_cwinv_sqrt", range(3)), ["all", "non_derived"])
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

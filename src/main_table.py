@@ -1,9 +1,10 @@
-"""主结果表（CPU）：T2 任务 4 种划分下各方法的表现（第 7.3 节表 7 的数据来源）。
+"""Main results table (CPU): performance of each method on the four splits of task T2 (source of Table 2 of the paper).
 
-方法：多数类、TF-IDF+LR（预测文件重算）、流水线（规则 R / Vieira 式，读 results/pipeline_baseline/metrics.json）、
-      DeBERTa 无辅助 / 有 v3.1 辅助（W4 选定配置，5 个种子的均值 ± 标准差）。
-口径：全部测试集；去掉 derived（留一 VulDB 的测试集全是 derived，没有此口径）。
-输出：results/main_table.md
+Methods: majority class, TF-IDF + LR (recomputed from the prediction files), the pipelines (rule R / Vieira-style, read from
+results/pipeline_baseline/metrics.json), DeBERTa without / with the v3.1 auxiliary task (configuration selected in W4; mean ± standard
+deviation over 5 seeds).
+Scopes: all test labels; without the derived labels (the test set of LOSO-VulDB is entirely derived, so it has no such scope).
+Output: results/main_table.md
 """
 
 import json
@@ -35,7 +36,7 @@ def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
     pipe = json.loads((ROOT / "results" / "pipeline_baseline" / "metrics.json").read_text(encoding="utf-8"))
-    lines = ["# 主结果表（T2，自动生成）\n", "DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方法为确定性结果（单次）。\n"]
+    lines = ["# Main results table (T2, generated automatically)\n", "The two DeBERTa rows give the mean ± standard deviation over 5 seeds of the configuration selected in W4; the other methods are deterministic (single run).\n"]
     for split in SPLITS:
         test = df[df["pub"] >= CUTOFF] if split == "temporal" else df[df["source"] == split.split(":")[1]]
         test = test.reset_index(drop=True)
@@ -59,8 +60,8 @@ def main():
                     res.append(scores(t, p))
                 rows[f"{name} ({len(runs)} seeds)"] = {k: (float(np.mean([r[k] for r in res])), float(np.std([r[k] for r in res], ddof=1)))
                                                       for k, _ in COLS}
-            lines += [f"\n## {split}（{'全部测试集' if scope == 'all' else '去掉 derived'}，n = {len(t):,}）\n",
-                      "| 方法 | " + " | ".join(c for _, c in COLS) + " |", "|---|" + "---|" * len(COLS)]
+            lines += [f"\n## {split} ({'all test labels' if scope == 'all' else 'without derived labels'}, n = {len(t):,})\n",
+                      "| Method | " + " | ".join(c for _, c in COLS) + " |", "|---|" + "---|" * len(COLS)]
             for name, r in rows.items():
                 lines.append(f"| {name} | " + " | ".join(f"{v:.3f}" + (f" ± {s:.3f}" if s is not None else "") for v, s in r.values()) + " |")
     out = ROOT / "results" / "main_table.md"

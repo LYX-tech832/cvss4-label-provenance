@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# W4 全自动批次（无人值守）：① 调参（只看验证集）→ ② 自动选配置 → ③ 5 个种子 × 4 种划分 × 2 个版本。
-# - 单个任务失败不会中断整批：记录到日志后继续下一个
-# - 已完成的任务会跳过（--skip_existing），中断后重新执行本脚本即可续跑
-# - 训练发散（loss 连续 20 步 NaN）会自动终止该任务（train_encoder.py 内置）
-# 用法（在项目根目录）：setsid nohup bash scripts/run_w4_all.sh > w4.out 2>&1 < /dev/null &
+# W4 batch, fully automatic (unattended): (1) tuning (validation set only) -> (2) automatic configuration selection -> (3) 5 seeds × 4 splits × 2 variants.
+# - A failed run does not stop the batch: it is logged and the next run starts
+# - Finished runs are skipped (--skip_existing); rerun this script to resume after an interruption
+# - Divergent training (loss NaN for 20 consecutive steps) stops that run (built into train_encoder.py)
+# Usage (from the project root): setsid nohup bash scripts/run_w4_all.sh > w4.out 2>&1 < /dev/null &
 set -o pipefail
 cd "$(dirname "$0")/.."
 MODEL=${MODEL:-microsoft/deberta-v3-base}

@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# 第二个编码器：在时间划分上换一个编码器，重复"有 / 无 v3.1 辅助任务"的比较，
-# 回答"增益是不是 DeBERTa 特有的"。用法：bash scripts/run_second_encoder.sh [阶段…]（不带参数 = TUNE SEEDS）
-#   TUNE   种子 0 的候选配置，与 DeBERTa 的做法相同（论文 6.2 节、表 S25）：
-#          无辅助：类别加权 {无, inv_sqrt} × 轮数上限 {5, 10}，再加步数相当的 25 轮（类别加权）  → 5 次，约 1.1 小时
-#          有辅助：λ {0.5, 1} × 类别加权 {无, inv_sqrt}，5 轮                                    → 4 次，约 2 小时
-#          跑完后按验证集各选一个（src/second_encoder.py select）。
-#   SEEDS  选中的两个配置各补种子 1–4（8 次，约 4 小时；无辅助若选中 5 轮则更短）。
-# 默认模型 ehsanaghaei/SecureBERT（RoBERTa-base 结构，网络安全语料上预训练）。权重文件 pytorch_model.bin 约 500 MB，
-# 首次运行时由 transformers 从 Hugging Face 镜像下载到服务器。时间按 DeBERTa-v3-base 在 RTX 4090 上的实测估计，合计约 7 小时。
-# 支持中断后续跑（--skip_existing）。跑完把 results/encoder/T2_temporal_SecureBERT_* 取回本机，再运行 python src/second_encoder.py summary。
+# Second encoder: repeats the comparison with and without the v3.1 auxiliary task on the temporal split with another encoder,
+# to check whether the gain is specific to DeBERTa. Usage: bash scripts/run_second_encoder.sh [stage...] (no argument = TUNE SEEDS)
+#   TUNE   seed-0 candidate configurations, as for DeBERTa (Section 6.2, Table S25):
+#          baseline: class weighting {none, inv_sqrt} × epoch cap {5, 10}, plus the step-matched 25 epochs (class-weighted)  -> 5 runs, about 1.1 hours
+#          auxiliary: λ {0.5, 1} × class weighting {none, inv_sqrt}, 5 epochs                                              -> 4 runs, about 2 hours
+#          afterwards one configuration each is selected on the validation set (src/second_encoder.py select).
+#   SEEDS  seeds 1-4 for the two selected configurations (8 runs, about 4 hours; shorter if the baseline selects 5 epochs).
+# Default model ehsanaghaei/SecureBERT (RoBERTa-base architecture, pre-trained on cybersecurity text). Its weights pytorch_model.bin
+# (about 500 MB) are downloaded to the server by transformers from a Hugging Face mirror on the first run. Times estimated from
+# DeBERTa-v3-base on an RTX 4090, about 7 hours in total.
+# Resumable after an interruption (--skip_existing). Afterwards, copy results/encoder/T2_temporal_SecureBERT_* to the local machine and
+# run python src/second_encoder.py summary.
 set -o pipefail
 cd "$(dirname "$0")/.."
 source /usr/local/miniconda3/bin/activate py312 2>/dev/null || true

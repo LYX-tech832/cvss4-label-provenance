@@ -1,11 +1,13 @@
-"""基率校正、训练端实验与滚动时间切点的 CPU 分析（约 20–30 分钟，主要是 TF-IDF 重拟合）：
+"""Base-rate correction, a training-side experiment and rolling time cut-offs (CPU, about 20-30 minutes, mostly TF-IDF refits):
 
-A. 基率校正：时间划分测试集上，各标签类型与主要来源的"最常见等级占比"（基率）、各方法的等级准确率、
-   两者之差，以及严重性等级的 Cohen's κ。说明 VulDB 上分数高主要来自基率高。
-B. 训练端实验：TF-IDF 基线的训练集去掉 VulDB 的标签后，在非 derived 测试标签及各来源上的变化（配对 bootstrap）。
-C. 滚动时间切点：TF-IDF 基线在 5 个截止日期上各训练一次，在随后一个季度上测试，
-   比较"全部标签"与"去掉 VulDB"的结果（来源分型只在 2026 年前的数据上做过，这里用"是否 VulDB"代替）。
-输出：results/review_checks/summary8.md
+A. Base-rate correction: on the temporal split test set, for each label type and the main sources, the share of the most frequent band
+   (base rate), each method's band accuracy, their difference, and Cohen's κ of the severity bands. Shows that the high scores on
+   VulDB come mostly from its high base rate.
+B. Training-side experiment: change of the TF-IDF baseline on the non-derived test labels and on each source when VulDB's labels are
+   removed from its training set (paired bootstrap).
+C. Rolling time cut-offs: the TF-IDF baseline is trained once at each of 5 cut-off dates and tested on the following quarter, comparing
+   all labels with the labels without VulDB (the source typing uses only data before 2026, so "VulDB or not" is used instead).
+Output: results/review_checks/summary8.md
 """
 
 import sys
@@ -33,15 +35,15 @@ def part_a(df, test, lines):
     ids = test["cve_id"]
     t = Encoded(test, "y_")
     methods = {"TF-IDF + LR": [read(ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_tfidf_lr.parquet", ids)],
-               "DeBERTa（25 轮，5 种子）": [read(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet", ids) for s in range(5)],
-               "DeBERTa + 辅助（5 种子）": [read(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet", ids) for s in range(5)]}
+               "DeBERTa (25 epochs, 5 seeds)": [read(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet", ids) for s in range(5)],
+               "DeBERTa + auxiliary (5 seeds)": [read(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet", ids) for s in range(5)]}
     enc = {m: [Encoded(p) for p in ps] for m, ps in methods.items()}
-    groups = [("全部", np.ones(len(test), bool)), ("非 derived", (test["label_type"] != "derived").to_numpy())]
-    groups += [(f"类型 {k}", (test["label_type"] == k).to_numpy()) for k in ["derived", "independent", "v4_only", "other"]]
-    groups += [(f"来源 {s}", (test["source"] == s).to_numpy()) for s in ["VulDB", "VulnCheck", "GitHub_M"]]
-    lines += ["## A. 基率校正：严重性等级（时间划分测试集）\n",
-              "基率 = 该组真实等级中最常见等级的占比（总猜这个等级能得到的等级准确率）。κ = 等级的 Cohen's κ（不加权）。DeBERTa 为 5 个种子的平均。\n",
-              "| 组 | n | 基率 | " + " | ".join(f"{m}：准确率 / 超出基率 / κ" for m in methods) + " |", "|---|---|---|" + "---|" * len(methods)]
+    groups = [("all", np.ones(len(test), bool)), ("non-derived", (test["label_type"] != "derived").to_numpy())]
+    groups += [(f"type {k}", (test["label_type"] == k).to_numpy()) for k in ["derived", "independent", "v4_only", "other"]]
+    groups += [(f"source {s}", (test["source"] == s).to_numpy()) for s in ["VulDB", "VulnCheck", "GitHub_M"]]
+    lines += ["## A. Base-rate correction: severity bands (temporal split test set)\n",
+              "Base rate = share of the most frequent band among the group's true bands (the band accuracy of always guessing that band). κ = unweighted Cohen's κ of the bands. DeBERTa averaged over 5 seeds.\n",
+              "| Group | n | Base rate | " + " | ".join(f"{m}: accuracy / above base rate / κ" for m in methods) + " |", "|---|---|---|" + "---|" * len(methods)]
     for name, m in groups:
         idx = np.flatnonzero(m)
         tb = t.band[idx]
@@ -72,13 +74,13 @@ def part_b(df, test, lines):
     nov.insert(0, "cve_id", ids.values)
     nov.to_parquet(ROOT / "results" / "review_checks" / "T2_temporal_tfidf_lr_noVulDBtrain.parquet")
     t, ef, en = Encoded(test, "y_"), Encoded(full), Encoded(nov)
-    lines += ["\n## B. 训练集去掉 VulDB 的标签（TF-IDF + LR；测试集不变）\n",
-              f"训练标签：全部 {len(train):,} 条；去掉 VulDB 后 {len(sub):,} 条（VulDB {len(train) - len(sub):,} 条，占 {(len(train) - len(sub)) / len(train):.1%}）。\n",
-              "| 测试口径 | n | 全部训练：平均宏 F1 / 等级准确率 | 去掉 VulDB 训练 | 差值（去掉 − 全部）：平均宏 F1 | 等级准确率 |", "|---|---|---|---|---|---|"]
-    groups = [("非 derived", (test["label_type"] != "derived").to_numpy()), ("derived（VulDB）", (test["label_type"] == "derived").to_numpy()),
-              ("类型 independent", (test["label_type"] == "independent").to_numpy()), ("类型 v4_only", (test["label_type"] == "v4_only").to_numpy()),
-              ("类型 other", (test["label_type"] == "other").to_numpy()), ("来源 VulnCheck", (test["source"] == "VulnCheck").to_numpy()),
-              ("来源 GitHub_M", (test["source"] == "GitHub_M").to_numpy())]
+    lines += ["\n## B. VulDB's labels removed from the training set (TF-IDF + LR; same test set)\n",
+              f"Training labels: all {len(train):,}; without VulDB {len(sub):,} (VulDB {len(train) - len(sub):,}, {(len(train) - len(sub)) / len(train):.1%}).\n",
+              "| Test scope | n | Trained on all: mean macro-F1 / band accuracy | Trained without VulDB | Difference (without − all): mean macro-F1 | Band accuracy |", "|---|---|---|---|---|---|"]
+    groups = [("non-derived", (test["label_type"] != "derived").to_numpy()), ("derived (VulDB)", (test["label_type"] == "derived").to_numpy()),
+              ("type independent", (test["label_type"] == "independent").to_numpy()), ("type v4_only", (test["label_type"] == "v4_only").to_numpy()),
+              ("type other", (test["label_type"] == "other").to_numpy()), ("source VulnCheck", (test["source"] == "VulnCheck").to_numpy()),
+              ("source GitHub_M", (test["source"] == "GitHub_M").to_numpy())]
     for name, m in groups:
         idx = np.flatnonzero(m)
         a, b = fast_scores(t, ef, idx), fast_scores(t, en, idx)
@@ -87,8 +89,8 @@ def part_b(df, test, lines):
 
 
 def part_c(df, lines):
-    lines += ["\n## C. 滚动时间切点（TF-IDF + LR；在截止日期之前的标签上训练，在随后一个季度上测试）\n",
-              "| 截止日期 | 训练 | 测试 | 测试中 VulDB 占比 | 全部：平均宏 F1 / 等级准确率 | 去掉 VulDB | 等级准确率之差 |", "|---|---|---|---|---|---|---|"]
+    lines += ["\n## C. Rolling time cut-offs (TF-IDF + LR; trained on the labels before the cut-off date, tested on the following quarter)\n",
+              "| Cut-off date | Training | Test | Share of VulDB in the test set | All: mean macro-F1 / band accuracy | Without VulDB | Difference in band accuracy |", "|---|---|---|---|---|---|---|"]
     cuts = ["2025-07-01", "2025-10-01", "2026-01-01", "2026-04-01", "2026-07-01"]
     for c in cuts:
         c0 = pd.Timestamp(c, tz="UTC")
@@ -107,7 +109,7 @@ def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
     test = df[df["pub"] >= CUTOFF].reset_index(drop=True)
-    lines = ["# 基率校正、训练端实验与滚动时间切点的 CPU 分析（自动生成）\n"]
+    lines = ["# Base-rate correction, training-side experiment and rolling time cut-offs (generated automatically)\n"]
     part_a(df, test, lines)
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     part_b(df, test, lines)

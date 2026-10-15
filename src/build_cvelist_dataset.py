@@ -1,9 +1,9 @@
-"""从 CVE List V5 全量快照构建记录表（W1 数据管线 v1）。
+"""Builds the record table from a complete snapshot of the CVE List V5 (W1 data pipeline v1).
 
-输入：cvelistV5 Releases 中的 `<日期>_all_CVEs_at_midnight.zip.zip`（外层 zip 里还套着一个 zip）。
-输出：data/processed/cve_records.parquet，每行一条 PUBLISHED 状态的 CVE，字段见 extract_record()。
+Input: `<date>_all_CVEs_at_midnight.zip.zip` from the cvelistV5 releases (the outer zip contains another zip).
+Output: data/processed/cve_records.parquet, one row per CVE in state PUBLISHED; fields as in extract_record().
 
-用法（在项目根目录下）：
+Usage (from the project root):
     python src/build_cvelist_dataset.py data/raw/2026-09-25_all_CVEs_at_midnight.zip.zip
 """
 

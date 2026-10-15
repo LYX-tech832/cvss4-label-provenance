@@ -1,14 +1,19 @@
-"""稳健性核查，第二批（CPU，约 10–20 分钟）。
+"""Robustness checks, second set (CPU, about 10-20 minutes).
 
-A. 辅助任务增益的未取整差值，以及把训练随机性算进去的两种区间：
-   种子层面的 t 区间（按种子号配对）；CVE 与种子一起重抽样的两层 bootstrap（每次对两个版本各自有放回地抽 5 个种子）。
-B. 大模型对比按测试集真实构成加权（每次 bootstrap 按真实比例从各类型里抽 2,000 条）。
-C. 逐指标的"虚高"：全部 vs 非 derived vs 干净子集（双版本评分且 v4 ≠ 规则 R(v3.1)）的宏 F1。
-D. 近似重复：测试描述与训练描述（v4 训练集、v3.1 池）的 TF-IDF 余弦相似度最大值；VulDB 描述里的自带严重度措辞。
-E. CNA 容器的更新时间（比记录级更新时间更接近"v4 向量何时写入"）：2026 年前发布、CNA 容器在 2026 年后更新的比例；
-   去掉这些 CVE 后分型是否改变；TF-IDF 基线去掉这些训练样本后测试结果变化多少。
-F. 合成换算约定：把 v4 标签换成"不是规则 R、但同样确定"的换算，看规则 R 一致率与 FD_oos 各给出多少。
-输出：results/review_checks/summary2.md
+A. Unrounded differences of the auxiliary-task gain, and two intervals that include training randomness: a seed-level t interval
+   (paired by seed number) and a two-level bootstrap that resamples CVEs and seeds together (in each resample, 5 seeds drawn with
+   replacement for each variant).
+B. LLM comparison weighted by the true composition of the test set (each bootstrap draws 2,000 CVEs from the label types in their true
+   proportions).
+C. Per-metric inflation: macro-F1 on all vs non-derived vs R-inconsistent labels (dual-scored and v4 ≠ rule R(v3.1)).
+D. Near-duplicates: maximum TF-IDF cosine similarity between test descriptions and training descriptions (v4 training set, v3.1 pool);
+   severity wording in VulDB's descriptions.
+E. Update time of the CNA container (closer to "when the v4 vector was written" than the record-level update time): share of CVEs
+   published before 2026 whose CNA container was updated after the start of 2026; whether the typing changes without these CVEs; how much
+   the TF-IDF baseline's test results change without these training samples.
+F. Synthetic conversion convention: v4 labels replaced by a conversion that is deterministic but differs from rule R, to see what the
+   rule-R agreement and FD_oos report.
+Output: results/review_checks/summary2.md
 """
 
 import json
@@ -49,16 +54,16 @@ def enc_preds(dirs, ids):
 
 
 def part_a(df, lines, rng):
-    lines += ["\n## A. 辅助任务增益：未取整差值与包含训练随机性的区间（平均宏 F1）\n",
-              "| 划分 | 口径 | 差值（未取整） | 各种子差值 | 种子 t 区间（配对，df=4） | 两层 bootstrap 区间（CVE × 种子） |", "|---|---|---|---|---|---|"]
+    lines += ["\n## A. Auxiliary-task gain: unrounded differences and intervals including training randomness (mean macro-F1)\n",
+              "| Split | Scope | Difference (unrounded) | Difference per seed | Seed t interval (paired, df=4) | Two-level bootstrap interval (CVE × seed) |", "|---|---|---|---|---|---|"]
     for split in SPLITS:
         ids = pd.read_parquet(runs(split, False)[0] / "pred_latent.parquet")["cve_id"]
         truth = df.set_index("cve_id").loc[ids].reset_index()
         t = Encoded(truth, "y_")
         pn, pa = enc_preds(runs(split, False), ids), enc_preds(runs(split, True), ids)
-        scopes = [("全部", np.arange(len(truth)))]
+        scopes = [("all", np.arange(len(truth)))]
         if split == "temporal":
-            scopes.append(("非 derived", np.flatnonzero(truth["label_type"].to_numpy() != "derived")))
+            scopes.append(("non-derived", np.flatnonzero(truth["label_type"].to_numpy() != "derived")))
         for name, pool in scopes:
             fa = np.array([fast_scores(t, p, pool)["mean_macro_f1"] for p in pa])
             fn = np.array([fast_scores(t, p, pool)["mean_macro_f1"] for p in pn])
@@ -87,17 +92,17 @@ def part_b(df, lines, rng):
     for cve, k in unknown:
         alt.iloc[pos[cve], alt.columns.get_loc(k)] = train["y_" + k].mode()[0]
     t = Encoded(s, "y_")
-    meth = {"DeepSeek（原做法）": [Encoded(llm.set_index("cve_id").loc[ids].reset_index())],
-            "DeepSeek（DONT_KNOW→最常见值）": [Encoded(alt)],
+    meth = {"DeepSeek (as in AutoCVSS)": [Encoded(llm.set_index("cve_id").loc[ids].reset_index())],
+            "DeepSeek (DONT_KNOW → most frequent)": [Encoded(alt)],
             "TF-IDF": [Encoded(pd.read_parquet(PRED / "T2_temporal_tfidf_lr.parquet").set_index("cve_id").loc[ids].reset_index())],
-            "DeBERTa + 辅助": enc_preds(runs("temporal", True), ids)}
+            "DeBERTa + auxiliary": enc_preds(runs("temporal", True), ids)}
     test = df[df["pub"] >= CUTOFF]
     comp = test["label_type"].value_counts()
     lt = s["label_type"].to_numpy()
-    lines += ["\n## B. 大模型对比按测试集真实构成加权（每次 bootstrap 从各类型按真实比例共抽 2,000 条，1,000 次；报告均值与 95% 区间）\n",
-              "测试集构成：" + "，".join(f"{k} {v:,}（{v / len(test):.1%}）" for k, v in comp.items()) + "\n",
-              "| 口径 | 方法 | 平均宏 F1 | 等级准确率 | 相对 TF-IDF 的宏 F1 差 | 等级准确率差 |", "|---|---|---|---|---|---|"]
-    for scope, types in [("加权整体", ["derived", "independent", "v4_only", "other"]), ("加权非 derived", ["independent", "v4_only", "other"])]:
+    lines += ["\n## B. LLM comparison weighted by the true composition of the test set (each bootstrap draws 2,000 CVEs from the label types in their true proportions, 1,000 times; mean and 95% interval)\n",
+              "Composition of the test set: " + ", ".join(f"{k} {v:,} ({v / len(test):.1%})" for k, v in comp.items()) + "\n",
+              "| Scope | Method | Mean macro-F1 | Band accuracy | Macro-F1 difference from TF-IDF | Band accuracy difference |", "|---|---|---|---|---|---|"]
+    for scope, types in [("weighted, all", ["derived", "independent", "v4_only", "other"]), ("weighted, non-derived", ["independent", "v4_only", "other"])]:
         w = comp[types] / comp[types].sum()
         sizes = {ty: int(round(2000 * w[ty])) for ty in types}
         strata = {ty: np.flatnonzero(lt == ty) for ty in types}
@@ -126,9 +131,9 @@ def part_c(test, lines):
     maj = pd.read_parquet(PRED / "T2_temporal_majority.parquet").set_index("cve_id").loc[test["cve_id"]].reset_index()
     ds = {v: [pd.read_parquet(d / "pred_latent.parquet").set_index("cve_id").loc[test["cve_id"]].reset_index() for d in runs("temporal", v)]
           for v in (False, True)}
-    masks = {"全部": np.ones(len(test), bool), "非 derived": (test["label_type"] != "derived").to_numpy(), "干净子集": test["clean"].to_numpy()}
-    lines += ["\n## C. 逐指标宏 F1（时间划分测试集；DeBERTa 为 5 种子均值）\n",
-              "| 指标 | 多数类 全部 / 非 derived | TF-IDF 全部 / 非 derived / 干净 | DeBERTa 全部 / 非 derived | DeBERTa+辅助 全部 / 非 derived / 干净 | TF-IDF 虚高（全部 − 非 derived） | DeBERTa+辅助 虚高 |",
+    masks = {"all": np.ones(len(test), bool), "non-derived": (test["label_type"] != "derived").to_numpy(), "R-inconsistent subset": test["clean"].to_numpy()}
+    lines += ["\n## C. Per-metric macro-F1 (temporal split test set; DeBERTa averaged over 5 seeds)\n",
+              "| Metric | Majority all / non-derived | TF-IDF all / non-derived / R-inconsistent | DeBERTa all / non-derived | DeBERTa+auxiliary all / non-derived / R-inconsistent | TF-IDF inflation (all − non-derived) | DeBERTa+auxiliary inflation |",
               "|---|---|---|---|---|---|---|"]
     res = {}
     for name, m in masks.items():
@@ -139,11 +144,11 @@ def part_c(test, lines):
             pm = [per_metric(tt, p[m]) for p in ds[v]]
             res[(v, name)] = {k: np.mean([x[k] for x in pm]) for k in M40}
     for k in M40:
-        lines.append(f"| {k} | {res[('maj', '全部')][k]:.3f} / {res[('maj', '非 derived')][k]:.3f} | "
-                     f"{res[('tf', '全部')][k]:.3f} / {res[('tf', '非 derived')][k]:.3f} / {res[('tf', '干净子集')][k]:.3f} | "
-                     f"{res[(False, '全部')][k]:.3f} / {res[(False, '非 derived')][k]:.3f} | "
-                     f"{res[(True, '全部')][k]:.3f} / {res[(True, '非 derived')][k]:.3f} / {res[(True, '干净子集')][k]:.3f} | "
-                     f"{res[('tf', '全部')][k] - res[('tf', '非 derived')][k]:+.3f} | {res[(True, '全部')][k] - res[(True, '非 derived')][k]:+.3f} |")
+        lines.append(f"| {k} | {res[('maj', 'all')][k]:.3f} / {res[('maj', 'non-derived')][k]:.3f} | "
+                     f"{res[('tf', 'all')][k]:.3f} / {res[('tf', 'non-derived')][k]:.3f} / {res[('tf', 'R-inconsistent subset')][k]:.3f} | "
+                     f"{res[(False, 'all')][k]:.3f} / {res[(False, 'non-derived')][k]:.3f} | "
+                     f"{res[(True, 'all')][k]:.3f} / {res[(True, 'non-derived')][k]:.3f} / {res[(True, 'R-inconsistent subset')][k]:.3f} | "
+                     f"{res[('tf', 'all')][k] - res[('tf', 'non-derived')][k]:+.3f} | {res[(True, 'all')][k] - res[(True, 'non-derived')][k]:+.3f} |")
     return tf, ds
 
 
@@ -161,29 +166,29 @@ def part_d(df, test, tf, ds, lines):
     pool = v31_pool(before_cutoff=True)
     s_tr = max_sim(test["description"].str.strip(), train["description"].str.strip())
     s_pool = max_sim(test["description"].str.strip(), pool["description"].str.strip())
-    lines += ["\n## D. 近似重复（TF-IDF 词项余弦相似度的最大值；≥ 0.9 视为近似重复）\n",
-              "| 标签类型 | n | 与 v4 训练描述近似重复 | 与 v3.1 池近似重复 | 相似度中位数（v4 训练） |", "|---|---|---|---|---|"]
+    lines += ["\n## D. Near-duplicates (maximum cosine similarity of TF-IDF term vectors; ≥ 0.9 counts as a near-duplicate)\n",
+              "| Label type | n | Near-duplicate of a v4 training description | Near-duplicate in the v3.1 pool | Median similarity (v4 training) |", "|---|---|---|---|---|"]
     for ty in ["derived", "independent", "v4_only", "other"]:
         m = (test["label_type"] == ty).to_numpy()
         lines.append(f"| {ty} | {m.sum():,} | {(s_tr[m] >= 0.9).mean():.1%} | {(s_pool[m] >= 0.9).mean():.1%} | {np.median(s_tr[m]):.2f} |")
     nd = s_tr < 0.9
-    lines.append("\n去掉与 v4 训练描述近似重复的测试 CVE 后（等级准确率；DeBERTa+辅助为 5 种子均值）：")
-    for name, m in [("derived", (test["label_type"] == "derived").to_numpy()), ("非 derived", (test["label_type"] != "derived").to_numpy())]:
-        for sub, mm in [("全部", m), ("去掉近似重复", m & nd)]:
+    lines.append("\nWithout the test CVEs that are near-duplicates of v4 training descriptions (band accuracy; DeBERTa+auxiliary averaged over 5 seeds):")
+    for name, m in [("derived", (test["label_type"] == "derived").to_numpy()), ("non-derived", (test["label_type"] != "derived").to_numpy())]:
+        for sub, mm in [("all", m), ("without near-duplicates", m & nd)]:
             b_tf = evaluate(test[mm].reset_index(drop=True), tf[mm].reset_index(drop=True))["band_acc"]
             b_ds = np.mean([evaluate(test[mm].reset_index(drop=True), p[mm].reset_index(drop=True))["band_acc"] for p in ds[True]])
-            lines.append(f"- {name}，{sub}（n = {mm.sum():,}）：TF-IDF {b_tf:.3f}，DeBERTa+辅助 {b_ds:.3f}")
+            lines.append(f"- {name}, {sub} (n = {mm.sum():,}): TF-IDF {b_tf:.3f}, DeBERTa+auxiliary {b_ds:.3f}")
     vul = df[df["source"] == "VulDB"]
     cls = vul["description"].str.extract(r"(?:classified|rated) as (critical|problematic|very critical|uncritical)", flags=re.I)[0].str.lower()
-    lines.append(f"\nVulDB 描述中含 \"classified/rated as <等级>\" 的：{cls.notna().mean():.1%}（{int(cls.notna().sum()):,} / {len(vul):,}）；各措辞与 v4.0 严重等级的交叉表（VulDB 全部 v4 标签）：\n")
+    lines.append(f"\nVulDB descriptions containing \"classified/rated as <severity>\": {cls.notna().mean():.1%} ({int(cls.notna().sum()):,} / {len(vul):,}); cross-table of the wordings and the v4.0 severity bands (all of VulDB's v4 labels):\n")
     band = vul.apply(lambda r: __import__("baselines_v0").v4_score("CVSS:4.0/" + "/".join(f"{k}:{r['y_' + k]}" for k in M40))[1], axis=1)
-    ct = pd.crosstab(cls.fillna("（无）"), band)
-    lines.append("| 措辞 | " + " | ".join(ct.columns) + " |")
+    ct = pd.crosstab(cls.fillna("—"), band)
+    lines.append("| Wording | " + " | ".join(ct.columns) + " |")
     lines.append("|---|" + "---|" * len(ct.columns))
     for w, row in ct.iterrows():
         lines.append(f"| {w} | " + " | ".join(f"{v:,}" for v in row) + " |")
     other = df[df["source"] != "VulDB"]["description"].str.contains(r"classified as (?:critical|problematic)", case=False).mean()
-    lines.append(f"\n其他来源的描述中出现同样措辞的比例：{other:.2%}")
+    lines.append(f"\nShare of descriptions of other sources with the same wording: {other:.2%}")
 
 
 def cna_updated(ids):
@@ -203,34 +208,34 @@ def part_e(df, lines):
     df = df.assign(cna_upd=df["cve_id"].map(upd))
     pre = df["pub"] < CUTOFF
     late = df["cna_upd"] >= CUTOFF
-    lines += ["\n## E. CNA 容器的更新时间（providerMetadata.dateUpdated；CNA 改动其容器任何内容都会更新它，所以仍是上限）\n",
-              f"- 缺少 CNA 容器更新时间的：{int(df['cna_upd'].isna().sum())} 条；",
-              f"- 2026 年前发布的 v4 样本 {int(pre.sum()):,} 条中，CNA 容器在 2026 年后更新过的 {int((pre & late).sum()):,} 条（{(pre & late).sum() / pre.sum():.1%}）；",
-              f"- 其中双版本评分的 {int((pre & df['has_v31']).sum()):,} 条中 {int((pre & late & df['has_v31']).sum()):,} 条（{(pre & late & df['has_v31']).sum() / (pre & df['has_v31']).sum():.1%}）；",
-              "- 按来源（训练部分 v4 样本 ≥ 500）：" + "；".join(
-                  f"{s} {g['mean']:.1%}（{int(g['size']):,} 条）" for s, g in df[pre].assign(late=late[pre]).groupby("source")["late"].agg(["mean", "size"]).query("size >= 500").sort_values("mean", ascending=False).iterrows())]
+    lines += ["\n## E. Update time of the CNA container (providerMetadata.dateUpdated; any change of the CNA to its container updates it, so it is still an upper bound)\n",
+              f"- Without an update time of the CNA container: {int(df['cna_upd'].isna().sum())}; ",
+              f"- of the {int(pre.sum()):,} v4 samples published before 2026, {int((pre & late).sum()):,} have a CNA container updated after the start of 2026 ({(pre & late).sum() / pre.sum():.1%}); ",
+              f"- of the {int((pre & df['has_v31']).sum()):,} dual-scored ones, {int((pre & late & df['has_v31']).sum()):,} ({(pre & late & df['has_v31']).sum() / (pre & df['has_v31']).sum():.1%}); ",
+              "- by source (at least 500 v4 samples in the training part): " + "; ".join(
+                  f"{s} {g['mean']:.1%} ({int(g['size']):,})" for s, g in df[pre].assign(late=late[pre]).groupby("source")["late"].agg(["mean", "size"]).query("size >= 500").sort_values("mean", ascending=False).iterrows())]
     # 分型：去掉可能在 2026 年后才写入 v4 的 CVE
     keep = df[pre & ~late]
     pairs = collect(keep)
     old = json.loads((ROOT / "results" / "label_provenance" / "source_types.json").read_text(encoding="utf-8"))
-    lines.append("\n去掉这些 CVE 后重新分型（2026 年前、双版本评分 ≥ 100 的来源）：")
+    lines.append("\nTyping repeated without these CVEs (before 2026, sources with at least 100 dual-scored CVEs):")
     for s, p in sorted(pairs.items(), key=lambda x: -len(x[1])):
         if len(p) >= 100:
             fd = analyse(p)["FD_oos"]
             new_t = "derived" if fd >= THRESHOLD else "independent"
-            lines.append(f"- {s}：{len(p):,} 对，FD_oos {fd:.1%} → {new_t}（原分型 {old.get(s, {}).get('type', '无')}，原 FD_oos {old.get(s, {}).get('FD_oos_pre2026', float('nan')):.1%}）")
+            lines.append(f"- {s}: {len(p):,} pairs, FD_oos {fd:.1%} → {new_t} (original type {old.get(s, {}).get('type', 'none')}, original FD_oos {old.get(s, {}).get('FD_oos_pre2026', float('nan')):.1%})")
     # TF-IDF 基线：去掉这些训练样本后重训
     test = df[df["pub"] >= CUTOFF]
-    lines.append("\nTF-IDF 基线去掉这些训练样本后重训（测试集不变）：")
-    for name, tr in [("原训练集", df[pre]), ("去掉 CNA 容器 2026 年后更新的", df[pre & ~late])]:
+    lines.append("\nTF-IDF baseline retrained without these training samples (same test set):")
+    for name, tr in [("original training set", df[pre]), ("without CNA containers updated after the start of 2026", df[pre & ~late])]:
         pred = pred_tfidf_lr(tr, test, with_v31=False)
-        for scope, m in [("全部", np.ones(len(test), bool)), ("非 derived", (test["label_type"] != "derived").to_numpy())]:
+        for scope, m in [("all", np.ones(len(test), bool)), ("non-derived", (test["label_type"] != "derived").to_numpy())]:
             r = evaluate(test[m].reset_index(drop=True), pred[m].reset_index(drop=True))
-            lines.append(f"- {name}（训练 {len(tr):,} 条），{scope}：平均宏 F1 {r['mean_macro_f1']:.3f}，等级准确率 {r['band_acc']:.3f}，低估率 {r['under_rate']:.3f}")
+            lines.append(f"- {name} (training {len(tr):,}), {scope}: mean macro-F1 {r['mean_macro_f1']:.3f}, band accuracy {r['band_acc']:.3f}, underestimation rate {r['under_rate']:.3f}")
 
 
 def alt_convention(d31):
-    """一个"不是规则 R、但同样确定"的换算约定：把攻击复杂度挪到 AT，UI:R → A，后续系统影响一律为 N。"""
+    """A conversion convention that is deterministic but differs from rule R: attack complexity moved to AT, UI:R -> A, subsequent-system impacts always N."""
     v = rule_convert(d31)
     v.update({"AC": "L", "AT": "P" if d31["AC"] == "H" else "N", "UI": "N" if d31["UI"] == "N" else "A", "SC": "N", "SI": "N", "SA": "N"})
     return tuple(v[k] for k in M40)
@@ -238,15 +243,15 @@ def alt_convention(d31):
 
 def part_f(df, lines):
     pairs = collect(df[df["pub"] < CUTOFF])
-    lines += ["\n## F. 合成换算约定（2026 年前的数据；把每个来源的 v4 标签换成确定的非规则 R 换算后再做检验）\n",
-              "| CNA | 对数 | 规则 R 一致率 | FD_oos（规则 R 回退） | FD_oos（只算见过的） | 回退触发率 | 是否被判为 derived |", "|---|---|---|---|---|---|---|"]
+    lines += ["\n## F. Synthetic conversion convention (data before 2026; each source's v4 labels replaced by a deterministic conversion other than rule R, then tested)\n",
+              "| CNA | Pairs | Rule-R agreement | FD_oos (rule-R fallback) | FD_oos (seen only) | Fallback rate | Typed as derived |", "|---|---|---|---|---|---|---|"]
     for s, p in sorted(pairs.items(), key=lambda x: -len(x[1])):
         if len(p) < 100:
             continue
         syn = [(t31, d31, alt_convention(d31), None) for t31, d31, _, _ in p]
         agree = np.mean([tuple(rule_convert(d31)[k] for k in M40) == t4 for _, d31, t4, _ in syn])
         r = fd_variants(syn)
-        lines.append(f"| {s} | {len(p):,} | {agree:.1%} | {r['fd_R']:.1%} | {r['fd_seen']:.1%} | {r['fallback']:.1%} | {'是' if r['fd_R'] >= THRESHOLD else '否'} |")
+        lines.append(f"| {s} | {len(p):,} | {agree:.1%} | {r['fd_R']:.1%} | {r['fd_seen']:.1%} | {r['fallback']:.1%} | {'yes' if r['fd_R'] >= THRESHOLD else 'no'} |")
 
 
 def main():
@@ -255,7 +260,7 @@ def main():
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
     test = df[df["pub"] >= CUTOFF].reset_index(drop=True)
     test["clean"] = clean_mask(test)
-    lines = ["# 稳健性核查（第二批，自动生成）\n"]
+    lines = ["# Robustness checks (second set, generated automatically)\n"]
     for step in [lambda: part_a(df, lines, rng), lambda: part_b(df, lines, rng)]:
         step()
         print("\n".join(lines[-12:]), flush=True)

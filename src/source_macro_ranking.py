@@ -1,9 +1,11 @@
-"""按来源等权时，方法的排名（10-05，CPU，约 3 分钟）。
+"""Ranking of the methods with equal weight per source (CPU, about 3 minutes).
 
-时间划分的非派生测试集里 VulnCheck 和 GitHub 占 59.6%，"非派生"的结果很大程度上是这两个来源的结果。
-表 S31 的来源宏平均没有包含流水线，所以"分类器与流水线的排名翻转"在每个来源等权的口径下是否成立，此前没有检查过。
-这里对每个测试 CVE ≥ 30（或 ≥ 100）条的来源分别算指标，再等权平均；差值的区间来自对来源的重抽样（2,000 次）。
-输出：results/review_checks/summary15.md
+VulnCheck and GitHub account for 59.6% of the non-derived test labels of the temporal split, so the non-derived results are largely
+the results of these two sources. This script checks whether the ranking of the classifiers and the pipelines also holds when every
+source has equal weight (the source-macro averages of Table S31 do not include the pipelines): metrics are computed for each source
+with at least 30 (or 100) test CVEs and averaged with equal weight; intervals of the differences come from resampling the sources
+(2,000 times).
+Output: results/review_checks/summary15.md
 """
 
 import sys
@@ -22,7 +24,7 @@ BASE = ROOT / "results" / "baselines_v0" / "predictions"
 PIPE = ROOT / "results" / "pipeline_baseline" / "predictions"
 OUT = ROOT / "results" / "review_checks" / "summary15.md"
 KEYS = ("mean_macro_f1", "band_acc", "under_rate")
-REF = "流水线（规则 R）"
+REF = "pipeline (rule R)"
 rng = np.random.default_rng(0)
 
 
@@ -36,9 +38,9 @@ def main():
         return Encoded(pd.read_parquet(path).set_index("cve_id").loc[ids].reset_index())
     methods = {"TF-IDF + LR": [enc(BASE / "T2_temporal_tfidf_lr.parquet")],
                REF: [enc(PIPE / "T2_temporal_pipeline_rule_R.parquet")],
-               "流水线（SC/SI/SA = N）": [enc(PIPE / "T2_temporal_pipeline_scsisa_N.parquet")],
-               "DeBERTa（25 轮）": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
-               "DeBERTa + 辅助": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
+               "pipeline (SC/SI/SA = N)": [enc(PIPE / "T2_temporal_pipeline_scsisa_N.parquet")],
+               "DeBERTa (25 epochs)": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
+               "DeBERTa + auxiliary": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
     src = test["source"].to_numpy()
     counts = test["source"].value_counts()
 
@@ -46,9 +48,9 @@ def main():
         rs = [fast_scores(t, e, idx) for e in methods[m]]
         return {k: float(np.mean([r[k] for r in rs])) for k in KEYS}
 
-    lines = ["# 按来源等权时方法的排名（时间划分测试集，自动生成）\n",
-             "## 0. 对照：按 CVE 合并（论文表 7 的口径）\n", "| 范围 | 方法 | 平均宏 F1 | 等级准确率 | 低估率 |", "|---|---|---|---|---|"]
-    for name, idx in [("全部（21,900）", np.arange(len(test))), ("非 VulDB（16,749）", np.flatnonzero(src != "VulDB"))]:
+    lines = ["# Ranking of the methods with equal weight per source (temporal split test set, generated automatically)\n",
+             "## 0. For comparison: pooled over CVEs (as in Table 2 of the paper)\n", "| Scope | Method | Mean macro-F1 | Band accuracy | Underestimation |", "|---|---|---|---|---|"]
+    for name, idx in [("all (21,900)", np.arange(len(test))), ("non-VulDB (16,749)", np.flatnonzero(src != "VulDB"))]:
         for m in methods:
             s = score(m, idx)
             lines.append(f"| {name} | {m} | " + " | ".join(f"{s[k]:.3f}" for k in KEYS) + " |")
@@ -56,14 +58,14 @@ def main():
     for min_n in (30, 100):
         keep_all = [s for s, n in counts.items() if n >= min_n]
         per = {m: {s: score(m, np.flatnonzero(src == s)) for s in keep_all} for m in methods}
-        for label, keep in [("全部来源", keep_all), ("不含 VulDB", [s for s in keep_all if s != "VulDB"])]:
+        for label, keep in [("all sources", keep_all), ("without VulDB", [s for s in keep_all if s != "VulDB"])]:
             n_cve = int(sum(counts[s] for s in keep))
-            lines += [f"\n## 测试 CVE ≥ {min_n} 条的来源，{label}：{len(keep)} 个（{n_cve:,} 条），每个来源等权\n",
-                      "| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |", "|---|---|---|---|"]
+            lines += [f"\n## Sources with at least {min_n} test CVEs, {label}: {len(keep)} sources ({n_cve:,} CVEs), equal weight per source\n",
+                      "| Method | Mean macro-F1 | Band accuracy | Underestimation |", "|---|---|---|---|"]
             for m in methods:
                 lines.append(f"| {m} | " + " | ".join(f"{np.mean([per[m][s][k] for s in keep]):.3f}" for k in KEYS) + " |")
-            lines += [f"\n与{REF}的差（方法 − 流水线；区间：对来源重抽样 2,000 次）\n",
-                      "| 方法 | 等级准确率差 | 方法更高的来源数 | 平均宏 F1 差 | 方法更高的来源数 |", "|---|---|---|---|---|"]
+            lines += [f"\nDifference from {REF} (method − pipeline; interval: sources resampled 2,000 times)\n",
+                      "| Method | Band accuracy difference | Sources where the method is higher | Mean macro-F1 difference | Sources where the method is higher |", "|---|---|---|---|---|"]
             for m in methods:
                 if m == REF:
                     continue
@@ -74,12 +76,12 @@ def main():
                     cells += [f"{d.mean():+.3f} [{np.percentile(bs, 2.5):+.3f}, {np.percentile(bs, 97.5):+.3f}]", f"{int((d > 0).sum())} / {len(keep)}"]
                 lines.append(f"| {m} | " + " | ".join(cells) + " |")
         if min_n == 100:
-            lines += ["\n### 各来源的等级准确率（≥ 100 条）：TF-IDF + LR / 流水线（规则 R）/ DeBERTa + 辅助\n", "| 来源 | n | TF-IDF + LR | 流水线（规则 R） | DeBERTa + 辅助 |", "|---|---|---|---|---|"]
+            lines += ["\n### Band accuracy of each source (at least 100 CVEs): TF-IDF + LR / pipeline (rule R) / DeBERTa + auxiliary\n", "| Source | n | TF-IDF + LR | pipeline (rule R) | DeBERTa + auxiliary |", "|---|---|---|---|---|"]
             for s in keep_all:
-                lines.append(f"| {s} | {counts[s]:,} | {per['TF-IDF + LR'][s]['band_acc']:.3f} | {per[REF][s]['band_acc']:.3f} | {per['DeBERTa + 辅助'][s]['band_acc']:.3f} |")
+                lines.append(f"| {s} | {counts[s]:,} | {per['TF-IDF + LR'][s]['band_acc']:.3f} | {per[REF][s]['band_acc']:.3f} | {per['DeBERTa + auxiliary'][s]['band_acc']:.3f} |")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
-    print(f"\n已写入 {OUT}")
+    print(f"\nwritten to {OUT}")
 
 
 if __name__ == "__main__":

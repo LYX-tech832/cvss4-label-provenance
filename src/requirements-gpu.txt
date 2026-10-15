@@ -1,4 +1,4 @@
-# GPU 平台上额外需要的包（torch 一般由平台镜像自带，不要在这里重装）
+# Additional packages needed on the GPU platform (torch usually comes with the platform image; do not reinstall it here)
 pandas>=2.2
 pyarrow>=15
 scikit-learn>=1.4

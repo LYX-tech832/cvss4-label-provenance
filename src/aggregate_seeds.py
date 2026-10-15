@@ -1,17 +1,19 @@
-"""多种子汇总与配对比较（CPU）：比较"有 / 无 v3.1 辅助任务"。
+"""Multi-seed summary and paired comparison (CPU): with and without the v3.1 auxiliary task.
 
-从 results/encoder/ 读取所有 T2 运行（运行名见 train_encoder.py），按（划分, 配置, 种子）配对：
-  配置 = 除"是否辅助"以外的超参数（轮数、类别加权）；辅助版本的 λ 单独作为配置的一部分记录。
-指标从 pred_latent.parquet 重新计算，口径分两种：全部测试集、去掉 derived 标签（VulDB 等）。
-统计（论文第 5.5 节的口径）：
-  - 每个（划分, 版本）的均值 ± 标准差；
-  - **主检验：各划分内的配对 bootstrap**——对该划分的测试 CVE 有放回重抽样 1,000 次，每次对两个版本各自的所有种子
-    求指标再按种子平均，取差值（有辅助 − 无辅助），报告 95% 百分位区间。不跨划分合并检验（各划分测试集不同）；
-    5 个种子也不做秩检验（n=5 时 Wilcoxon 双侧最小 p 值为 0.0625）；
-  - 描述性汇总：全部（划分, 种子）配对中，差值 > 0 的有几对。
-输出：results/encoder/aggregate_seeds.md
-用法：python src/aggregate_seeds.py [--config_none e5_cwinv_sqrt] [--config_aux e5] [--lam 1]
-（有/无辅助两个版本可以各自使用在验证集上选出的最佳配置）
+Reads all T2 runs in results/encoder/ (run names as in train_encoder.py) and pairs them by (split, configuration, seed):
+  configuration = the hyperparameters other than the auxiliary task (epochs, class weighting); the λ of the auxiliary variant is recorded
+  as part of its configuration.
+Metrics are recomputed from pred_latent.parquet on two scopes: all test labels, and without derived labels (VulDB etc.).
+Statistics (as in Section 5.5 of the paper):
+  - mean ± standard deviation per (split, variant);
+  - **main test: paired bootstrap within each split**: the split's test CVEs are resampled with replacement 1,000 times; in each resample
+    the metrics of every seed of both variants are computed and averaged over seeds, and the difference (auxiliary − baseline) is taken;
+    the 95% percentile interval is reported. No test pools the splits (their test sets differ); no rank test over the 5 seeds
+    (with n = 5 the smallest two-sided Wilcoxon p-value is 0.0625);
+  - descriptive summary: over all (split, seed) pairs, the number of pairs with a difference > 0.
+Output: results/encoder/aggregate_seeds.md
+Usage: python src/aggregate_seeds.py [--config_none e5_cwinv_sqrt] [--config_aux e5] [--lam 1]
+(the two variants can each use the best configuration selected on the validation set)
 """
 
 import argparse
@@ -45,7 +47,7 @@ def metrics(run_dir, df):
 
 
 class Encoded:
-    """把一组预测（或真实标签）编码成便于快速重抽样计算的数组：各指标的整数编码、CVSS-B 分数、严重性等级序号。"""
+    """Encode a set of predictions (or true labels) as arrays for fast resampling: integer codes of each metric, CVSS-B score, band index."""
 
     def __init__(self, frame, prefix=""):
         self.codes = {k: frame[prefix + k].map({v: i for i, v in enumerate(V40_METRICS[k])}).to_numpy() for k in M40}
@@ -56,7 +58,7 @@ class Encoded:
 
 
 def fast_scores(t, p, idx):
-    """与 evaluate() 同一口径（宏 F1 用完整标签集，未出现的类记 0 分），但只算重抽样需要的几项，速度快得多。"""
+    """Same definitions as evaluate() (macro-F1 over the full label set, classes that do not occur score 0), but only the quantities needed for resampling, much faster."""
     f1s = []
     for k in M40:
         n_cls = len(V40_METRICS[k])
@@ -73,7 +75,7 @@ BOOT_KEYS = ["mean_macro_f1", "band_acc", "under_rate", "score_mae"]
 
 
 def paired_bootstrap(df, dirs_none, dirs_aux, B=1000, seed=0):
-    """一个划分内：两个版本（各若干种子）在同一批测试 CVE 上的差值（有辅助 − 无辅助）及其 95% 百分位区间。"""
+    """Within one split: difference between two variants (several seeds each) on the same test CVEs (auxiliary − baseline) and its 95% percentile interval."""
     ids = pd.read_parquet(next(iter(dirs_none.values())) / "pred_latent.parquet")["cve_id"]
     truth = df.set_index("cve_id").loc[ids].reset_index()
     t = Encoded(truth, "y_")
@@ -99,10 +101,10 @@ def paired_bootstrap(df, dirs_none, dirs_aux, B=1000, seed=0):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config_none", default="", help="无辅助版本的配置后缀，例如 e5_cwinv_sqrt；空字符串 = 默认配置")
-    ap.add_argument("--config_aux", default="", help="有辅助版本的配置后缀（不含 λ）")
-    ap.add_argument("--lam", default="0.5", help="辅助版本使用的 λ，如 0.5 或 1")
-    ap.add_argument("--boot", type=int, default=1000, help="配对 bootstrap 的重抽样次数（0 = 不做）")
+    ap.add_argument("--config_none", default="", help="configuration suffix of the baseline variant, e.g. e5_cwinv_sqrt; empty string = default configuration")
+    ap.add_argument("--config_aux", default="", help="configuration suffix of the auxiliary variant (without λ)")
+    ap.add_argument("--lam", default="0.5", help="λ of the auxiliary variant, e.g. 0.5 or 1")
+    ap.add_argument("--boot", type=int, default=1000, help="number of resamples of the paired bootstrap (0 = none)")
     args = ap.parse_args()
     cfg = {"none": ("_" + args.config_none) if args.config_none else "", "aux": ("_" + args.config_aux) if args.config_aux else ""}
     df = load()
@@ -120,10 +122,10 @@ def main():
         runs[(m["split"], ver)][int(m["seed"])] = metrics(d, df)
         dirs[(m["split"], ver)][int(m["seed"])] = d
 
-    lines = [f"# 多种子汇总（无辅助配置 '{args.config_none or '默认'}'；有辅助配置 '{args.config_aux or '默认'}'，λ = {args.lam}）\n"]
+    lines = [f"# Multi-seed summary (baseline configuration '{args.config_none or 'default'}'; auxiliary configuration '{args.config_aux or 'default'}', λ = {args.lam})\n"]
     for scope in ["all", "non_derived"]:
-        lines += [f"\n## 口径：{'全部测试集' if scope == 'all' else '去掉 derived 标签'}\n",
-                  "| 划分 | 版本 | 种子数 | " + " | ".join(KEYS) + " |", "|---" * (3 + len(KEYS)) + "|"]
+        lines += [f"\n## Scope: {'all test labels' if scope == 'all' else 'without derived labels'}\n",
+                  "| Split | Variant | Seeds | " + " | ".join(KEYS) + " |", "|---" * (3 + len(KEYS)) + "|"]
         for (split, ver), seeds in sorted(runs.items()):
             vals = {k: [s[scope][k] for s in seeds.values() if scope in s] for k in KEYS}
             if not vals["mean_macro_f1"]:
@@ -142,30 +144,30 @@ def main():
                         diffs[k].append(a[scope][k] - b[scope][k])
                         per_split[split][k].append(a[scope][k] - b[scope][k])
         n = len(diffs["mean_macro_f1"])
-        lines += [f"\n描述性汇总：全部（划分, 种子）配对的差值（有辅助 − 无辅助），共 {n} 对（不作显著性检验，见第 5.5 节）：",
-                  "| 指标 | 平均差值 | 差值 > 0 的对数 |", "|---|---|---|"]
+        lines += [f"\nDescriptive summary: differences (auxiliary − baseline) over all (split, seed) pairs, {n} pairs (no significance test, see Section 5.5):",
+                  "| Metric | Mean difference | Pairs with difference > 0 |", "|---|---|---|"]
         for k in KEYS:
             d = np.array(diffs[k])
             lines.append(f"| {k} | {d.mean():+.4f} | {(d > 0).sum()}/{n} |" if n else f"| {k} | - | - |")
         if not n:
             continue
-        lines.append("\n各划分的平均差值（平均F1 / 等级准确率 / 低估率）：" + "；".join(
-            f"{s}: {np.mean(v['mean_macro_f1']):+.3f} / {np.mean(v['band_acc']):+.3f} / {np.mean(v['under_rate']):+.3f}（{len(v['mean_macro_f1'])} 对）"
+        lines.append("\nMean difference per split (mean F1 / band accuracy / underestimation rate): " + "; ".join(
+            f"{s}: {np.mean(v['mean_macro_f1']):+.3f} / {np.mean(v['band_acc']):+.3f} / {np.mean(v['under_rate']):+.3f} ({len(v['mean_macro_f1'])} pairs)"
             for s, v in sorted(per_split.items())))
 
     # 主检验：各划分内的配对 bootstrap（论文第 5.5 节）
     if args.boot > 0:
-        lines += [f"\n## 各划分内的配对 bootstrap（有辅助 − 无辅助；先按种子平均；{args.boot} 次重抽样；95% 百分位区间）\n",
-                  "| 划分 | 口径 | n | 种子数（无/有） | 平均宏 F1 差 | 等级准确率差 | 低估率差 | 分数 MAE 差 |", "|---|---|---|---|---|---|---|---|"]
+        lines += [f"\n## Paired bootstrap within each split (auxiliary − baseline; averaged over seeds first; {args.boot} resamples; 95% percentile interval)\n",
+                  "| Split | Scope | n | Seeds (baseline/aux) | Mean macro-F1 difference | Band accuracy difference | Underestimation difference | Score MAE difference |", "|---|---|---|---|---|---|---|---|"]
         for split in sorted({s for s, _ in dirs}):
             if (split, "none") not in dirs or (split, "aux") not in dirs:
                 continue
             res = paired_bootstrap(df, dirs[(split, "none")], dirs[(split, "aux")], B=args.boot)
             for scope, r in res.items():
                 cells = " | ".join(f"{r[k][0]:+.3f} [{r[k][1]:+.3f}, {r[k][2]:+.3f}]" for k in BOOT_KEYS)
-                lines.append(f"| {split} | {'全部' if scope == 'all' else '去掉 derived'} | {r['n']:,} | "
+                lines.append(f"| {split} | {'all' if scope == 'all' else 'without derived'} | {r['n']:,} | "
                              f"{len(dirs[(split, 'none')])}/{len(dirs[(split, 'aux')])} | {cells} |")
-        lines.append("\n区间不含 0 即表示在该划分上差异稳定。低估率和 MAE 越小越好，所以这两列的差值为负才表示改进。")
+        lines.append("\nAn interval that excludes 0 indicates a stable difference on that split. Lower underestimation rate and MAE are better, so a negative difference in these two columns is an improvement.")
     out = ENC / "aggregate_seeds.md"
     out.write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))

@@ -1,10 +1,11 @@
-"""补充的两项（10-05，CPU，约 2 分钟）：
+"""Decision-oriented metrics on the LLM sample, and an example of derived labels (CPU, about 2 minutes):
 
-1. 大模型样本（2,000 条）上各方法的低估率 / 高危召回率，按整体、非 derived 和四种标签类型分组。
-   论文 7.5 节引用了大模型的这两个指标，但原来没有任何表给出（表 9 只有平均宏 F1 和等级准确率）。→ 补充材料表 S37
-   同时输出平均宏 F1 / 等级准确率，用来核对与表 9 一致。
-2. 一个派生标签的具体例子：VulDB 最常见的 v3.1 向量对应多少种 v4.0 向量，与 VulnCheck 对比。→ 4.3 节
-输出：results/review_checks/summary14.md
+1. Underestimation rate and High+Critical recall of each method on the LLM sample (2,000 CVEs), for the whole sample, the non-derived
+   labels and the four label types (Table S37; Section 7.5). Mean macro-F1 and band accuracy are also written, to check that they
+   match Table 4.
+2. An example of derived labels: how many distinct v4.0 vectors correspond to VulDB's most frequent v3.1 vectors, compared with
+   VulnCheck (Section 4.3).
+Output: results/review_checks/summary14.md
 """
 
 import json
@@ -23,7 +24,7 @@ ENC = ROOT / "results" / "encoder"
 LLM = ROOT / "results" / "autocvss_baseline"
 OUT = ROOT / "results" / "review_checks" / "summary14.md"
 STEM = "T2_temporal_deberta-v3-base_none"
-SCOPES = [("样本整体", None), ("非 derived", "nd"), ("derived", "derived"), ("undetected", "independent"), ("v4-only", "v4_only"), ("other", "other")]
+SCOPES = [("whole sample", None), ("non-derived", "nd"), ("derived", "derived"), ("undetected", "independent"), ("v4-only", "v4_only"), ("other", "other")]
 
 
 def main():
@@ -50,13 +51,13 @@ def main():
         return pd.read_parquet(p).set_index("cve_id").loc[ids].reset_index()
 
     methods = [("AutoCVSS + DeepSeek-V4-Pro", [llm]),
-               ("– \"don't know\" → 训练集众数", [alt]),
+               ("– \"don't know\" → training-set mode", [alt]),
                ("AutoCVSS + Qwen3-8B", [rd(LLM / "Qwen3-8B_DTD_s0" / "predictions.parquet")]),
-               ("多数类", [rd(ROOT / "results/baselines_v0/predictions/T2_temporal_majority.parquet")]),
+               ("majority class", [rd(ROOT / "results/baselines_v0/predictions/T2_temporal_majority.parquet")]),
                ("TF-IDF + LR", [rd(ROOT / "results/baselines_v0/predictions/T2_temporal_tfidf_lr.parquet")]),
-               ("TF-IDF + LR（只用描述）", [rd(ROOT / "results/ablation_desc_only/T2_temporal_tfidf_lr_desc_only.parquet")]),
-               ("DeBERTa（25 轮，5 种子）", [rd(ENC / f"{STEM}_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]),
-               ("DeBERTa + v3.1 辅助（5 种子）", [rd(ENC / f"{STEM}_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)])]
+               ("TF-IDF + LR (description only)", [rd(ROOT / "results/ablation_desc_only/T2_temporal_tfidf_lr_desc_only.parquet")]),
+               ("DeBERTa (25 epochs, 5 seeds)", [rd(ENC / f"{STEM}_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]),
+               ("DeBERTa + v3.1 auxiliary task (5 seeds)", [rd(ENC / f"{STEM}_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)])]
 
     res = {}
     for name, plist in methods:
@@ -65,12 +66,12 @@ def main():
             rs = [evaluate(test[m].reset_index(drop=True), p[m].reset_index(drop=True)) for p in plist]
             res[(name, scope)] = {k: float(np.mean([r[k] for r in rs])) for k in ("mean_macro_f1", "band_acc", "under_rate", "hc_recall")}
     n = {scope: int((np.ones(len(test), bool) if key is None else (lt != "derived") if key == "nd" else (lt == key)).sum()) for scope, key in SCOPES}
-    head = "| 方法 | " + " | ".join(f"{s}（{n[s]:,}）" for s, _ in SCOPES) + " |"
-    lines = ["# 大模型样本上的决策指标，以及一个派生标签的例子（自动生成）\n",
-             "## 1. 低估率 / 高危召回率（大模型样本 2,000 条；DeBERTa 为 5 个种子的平均）→ 表 S37\n", head, "|---|" + "---|" * len(SCOPES)]
+    head = "| Method | " + " | ".join(f"{s} ({n[s]:,})" for s, _ in SCOPES) + " |"
+    lines = ["# Decision-oriented metrics on the LLM sample, and an example of derived labels (generated automatically)\n",
+             "## 1. Underestimation rate / High+Critical recall (LLM sample, 2,000 CVEs; DeBERTa averaged over 5 seeds) → Table S37\n", head, "|---|" + "---|" * len(SCOPES)]
     for name, _ in methods:
         lines.append(f"| {name} | " + " | ".join(f"{res[(name, s)]['under_rate']:.3f} / {res[(name, s)]['hc_recall']:.3f}" for s, _ in SCOPES) + " |")
-    lines += ["\n核对用：平均宏 F1 / 等级准确率（应与论文表 9 一致）\n", head, "|---|" + "---|" * len(SCOPES)]
+    lines += ["\nFor checking: mean macro-F1 / band accuracy (should match Table 4 of the paper)\n", head, "|---|" + "---|" * len(SCOPES)]
     for name, _ in methods:
         lines.append(f"| {name} | " + " | ".join(f"{res[(name, s)]['mean_macro_f1']:.3f} / {res[(name, s)]['band_acc']:.3f}" for s, _ in SCOPES) + " |")
 
@@ -80,8 +81,8 @@ def main():
     d["v40"] = d[["y_" + k for k in M40]].apply(lambda r: "/".join(f"{k}:{v}" for k, v in zip(M40, r)), axis=1)
     vul = d[d["source"] == "VulDB"]
     top = vul["v31"].value_counts()
-    lines += ["\n## 2. 派生标签的例子（全部数据中有同来源 v3.1 向量的 CVE）→ 4.3 节\n",
-              "| 来源 | v3.1 向量 | 条数 | 对应的 v4.0 向量种数 | 最常见的 v4.0 向量 | 其条数（占比） | 规则 R 的结果 |", "|---|---|---|---|---|---|---|"]
+    lines += ["\n## 2. An example of derived labels (all CVEs with a same-source v3.1 vector) → Section 4.3\n",
+              "| Source | v3.1 vector | CVEs | Distinct v4.0 vectors | Most frequent v4.0 vector | Its count (share) | Result of rule R |", "|---|---|---|---|---|---|---|"]
     for v31 in top.index[:3]:
         r = rule_convert(dict(kv.split(":") for kv in v31.split("/")))
         rule = "/".join(f"{k}:{r[k]}" for k in M40)
@@ -91,11 +92,11 @@ def main():
                 lines.append(f"| {src} | {v31} | 0 | – | – | – | {rule} |")
                 continue
             vc = sub["v40"].value_counts()
-            lines.append(f"| {src} | {v31} | {len(sub):,} | {len(vc)} | {vc.index[0]} | {vc.iloc[0]:,}（{vc.iloc[0] / len(sub):.1%}） | {rule} |")
-    lines.append(f"\nVulDB 共有 {len(vul):,} 条带同来源 v3.1 向量的 CVE，{vul['v31'].nunique()} 种 v3.1 向量、{vul['v40'].nunique()} 种 v4.0 向量。")
+            lines.append(f"| {src} | {v31} | {len(sub):,} | {len(vc)} | {vc.index[0]} | {vc.iloc[0]:,} ({vc.iloc[0] / len(sub):.1%}) | {rule} |")
+    lines.append(f"\nVulDB has {len(vul):,} CVEs with a same-source v3.1 vector: {vul['v31'].nunique()} distinct v3.1 vectors and {vul['v40'].nunique()} distinct v4.0 vectors.")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
-    print(f"\n已写入 {OUT}")
+    print(f"\nwritten to {OUT}")
 
 
 if __name__ == "__main__":

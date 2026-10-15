@@ -1,18 +1,19 @@
-"""标签来源体检：每个来源的 v4.0 向量，在多大程度上是其 v3.1 向量的确定性函数？（与具体规则无关）
+"""Label provenance audit: to what extent is each source's v4.0 vector a deterministic function of its own v3.1 vector? (Independent of any particular rule.)
 
-对每个同来源 v3.1/v4.0 对 ≥ 100 的来源计算：
-  rule_*     若干条固定换算规则的整向量命中率（规则 R 及其变体，用于敏感性分析）
-  FD_in      样本内函数依赖度：按 v3.1 向量分组，组内取出现最多的 v4 向量，命中比例
-             = 任何"只看 v3.1 的确定性函数"能达到的上限
-  FD_oos     样本外函数依赖度：按时间取该来源前 70% 学"v3.1→最常见 v4"的映射，在后 30% 上检验；
-             没见过的 v3.1 向量退回规则 R
-  per-metric 各 v4 特有指标（AT/UI/SC/SI/SA）的样本内确定比例
-来源分型（只用 2026-01-01 之前的数据，供实验划分使用，避免用测试期标签定义分组）：
-  derived      FD_oos ≥ 阈值（默认 0.90；另报 0.80 / 0.95 下的分型作敏感性分析）
-  independent  有足够的对（≥100）但 FD_oos < 阈值
-  v4_only      v4 标签 ≥ 100 且同来源配对率 < 5%
-另外报告：主要来源按季度的规则 R 命中率（换算习惯随时间的变化），以及"有效独立标签"数量。
-输出：results/label_provenance/summary.md、source_types.json
+For each source with at least 100 same-source v3.1/v4.0 pairs:
+  rule_*     exact-vector hit rate of several fixed conversion rules (rule R and its variants, for the sensitivity analysis)
+  FD_in      in-sample functional dependence: group the pairs by v3.1 vector, take the most frequent v4 vector of each group, share of hits
+             = the upper bound for any deterministic function of the v3.1 vector alone
+  FD_oos     out-of-sample functional dependence: learn the mapping "v3.1 -> most frequent v4" on the source's earliest 70% (by time),
+             test it on the remaining 30%; v3.1 vectors not seen in training fall back to rule R
+  per-metric in-sample deterministic share of each v4-specific metric (AT/UI/SC/SI/SA)
+Source typing (uses only data before 2026-01-01, so that the groups used by the splits are not defined with labels of the test period):
+  derived      FD_oos >= threshold (default 0.90; the typing at 0.80 and 0.95 is reported as a sensitivity analysis)
+  independent  enough pairs (>= 100) but FD_oos < threshold
+  v4_only      at least 100 v4 labels and a same-source pairing rate below 5%
+Also reported: the quarterly rule-R hit rate of the main sources (changes of conversion practice over time) and an estimate of the labels
+that carry information beyond the v3.1 vector.
+Output: results/label_provenance/summary.md, source_types.json
 """
 
 THRESHOLD = 0.90
@@ -44,15 +45,15 @@ def variant(v31, ui_r="P", sub_from_scope=True):
 
 
 RULES = {
-    "R（UI:R→P，S:C 照抄）": dict(ui_r="P", sub_from_scope=True),
+    "R (UI:R→P, S:C copied)": dict(ui_r="P", sub_from_scope=True),
     "UI:R→A": dict(ui_r="A", sub_from_scope=True),
-    "后续影响恒为 N": dict(ui_r="P", sub_from_scope=False),
-    "UI:R→A 且后续恒 N": dict(ui_r="A", sub_from_scope=False),
+    "subsequent impacts always N": dict(ui_r="P", sub_from_scope=False),
+    "UI:R→A and subsequent always N": dict(ui_r="A", sub_from_scope=False),
 }
 
 
 def analyse(pairs):
-    """pairs: 按时间排序的 [(v31_tuple, v31_dict, v4_tuple, v4_dict)]"""
+    """pairs: [(v31_tuple, v31_dict, v4_tuple, v4_dict)] sorted by time"""
     n = len(pairs)
     res = {"n_pairs": n}
     for name, kw in RULES.items():
@@ -108,39 +109,39 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "source_types.json").write_text(json.dumps(types, indent=1, ensure_ascii=False), encoding="utf-8")
 
-    lines = ["# 标签来源体检（全时段；同来源 v3.1/v4.0 对 ≥ 100 的来源）\n",
-             "| 来源 | v4 总数 | 对数 | 不同 v3.1 向量数 | " + " | ".join(RULES) + " | FD_in | **FD_oos** | " + " | ".join(f"确定-{k}" for k in V4_SPECIFIC) + " |",
+    lines = ["# Label provenance audit (all periods; sources with at least 100 same-source v3.1/v4.0 pairs)\n",
+             "| Source | v4 labels | Pairs | Distinct v3.1 vectors | " + " | ".join(RULES) + " | FD_in | **FD_oos** | " + " | ".join(f"det-{k}" for k in V4_SPECIFIC) + " |",
              "|---" * (5 + len(RULES) + 1 + len(V4_SPECIFIC)) + "|"]
     for s, r in sorted(rows.items(), key=lambda x: -x[1]["n_pairs"]):
         lines.append(f"| {s} | {r['n_v4']:,} | {r['n_pairs']:,} | {r['n_distinct_v31']} | " + " | ".join(f"{r[k]:.1%}" for k in RULES)
                      + f" | {r['FD_in']:.1%} | **{r['FD_oos']:.1%}** | " + " | ".join(f"{r['det_' + k]:.1%}" for k in V4_SPECIFIC) + " |")
-    lines.append(f"\n## 来源分型（只用 2026-01-01 之前的数据；阈值 FD_oos ≥ {THRESHOLD:.0%} 判为 derived）\n")
+    lines.append(f"\n## Source typing (data before 2026-01-01 only; FD_oos ≥ {THRESHOLD:.0%} means derived)\n")
     for t in ["derived", "independent", "v4_only"]:
-        members = [f"{s}（{v.get('FD_oos_pre2026', float('nan')):.1%}）" if t != "v4_only" else f"{s}（n={v['n_v4_pre2026']}）"
+        members = [f"{s} ({v.get('FD_oos_pre2026', float('nan')):.1%})" if t != "v4_only" else f"{s} (n={v['n_v4_pre2026']})"
                    for s, v in types.items() if v["type"] == t]
-        lines.append(f"- **{t}**：" + "，".join(members))
+        lines.append(f"- **{t}**: " + ", ".join(members))
     share = {t: sum(n_v4.get(s, 0) for s, v in types.items() if v["type"] == t) / len(df) for t in ["derived", "independent", "v4_only"]}
-    lines.append("\n全部 v4 标签中各类型占比（按上面的分型）：" + "，".join(f"{t} {x:.1%}" for t, x in share.items())
-                 + f"，未分型（小来源）{1 - sum(share.values()):.1%}")
-    lines.append("\n阈值敏感性（被判为 derived 的来源）：" + "；".join(
-        f"≥{th:.0%}：" + ("、".join(s for s, f in fd_pre.items() if f >= th) or "无") for th in SENSITIVITY))
+    lines.append("\nShare of each type among all v4 labels (typing above): " + ", ".join(f"{t} {x:.1%}" for t, x in share.items())
+                 + f", untyped (small sources) {1 - sum(share.values()):.1%}")
+    lines.append("\nThreshold sensitivity (sources typed as derived): " + "; ".join(
+        f"≥{th:.0%}: " + (", ".join(s for s, f in fd_pre.items() if f >= th) or "none") for th in SENSITIVITY))
 
     # 按季度的规则 R 命中率（对数 ≥ 500 的来源；季度内对数 ≥ 30 才报告）
-    lines.append("\n## 主要来源按季度的规则 R 整向量命中率\n")
+    lines.append("\n## Quarterly exact-vector hit rate of rule R for the main sources\n")
     p = df[df["has_v31"]].copy()
     p["q"] = p["pub"].dt.tz_convert(None).dt.to_period("Q").astype(str)
     p["R"] = [rule_convert({k: r["x31_" + k] for k in M31}) == {k: r["y_" + k] for k in M40} for _, r in p.iterrows()]
     for s in [s for s, pp in all_pairs.items() if len(pp) >= 500]:
         g = p[p["source"] == s].groupby("q")["R"].agg(["size", "mean"])
         g = g[g["size"] >= 30]
-        lines.append(f"- {s}：" + "，".join(f"{q} {m:.0%}（n={int(n)}）" for q, (n, m) in g.iterrows()))
+        lines.append(f"- {s}: " + ", ".join(f"{q} {m:.0%} (n={int(n)})" for q, (n, m) in g.iterrows()))
 
     # 有效独立标签：只给 v4 的标签 + 与规则 R 不一致的同来源对（与 R 一致 ≠ 一定是换算，只是上界估计）
     pairs_all = df[df["has_v31"]]
     r_hit = p["R"].sum()
-    lines.append(f"\n## 有效标签估计\n\n- v4 标签总数 {len(df):,}；其中只给 v4（无同来源 v3.1）{len(df) - len(pairs_all):,}；"
-                 f"同来源对 {len(pairs_all):,}，其中与规则 R 完全一致 {int(r_hit):,}（{r_hit / len(pairs_all):.1%}）")
-    lines.append(f"- 与 R(v3.1) 不一致或没有 v3.1 的标签（「携带 v3.1 之外信息」的上界）：{len(df) - int(r_hit):,}（占 {(len(df) - r_hit) / len(df):.1%}）")
+    lines.append(f"\n## Labels that carry information beyond the v3.1 vector\n\n- v4 labels in total {len(df):,}; of these, v4 only (no same-source v3.1) {len(df) - len(pairs_all):,}; "
+                 f"same-source pairs {len(pairs_all):,}, of which identical to rule R {int(r_hit):,} ({r_hit / len(pairs_all):.1%})")
+    lines.append(f"- Labels that differ from R(v3.1) or have no v3.1 vector (upper bound of the labels that carry information beyond the v3.1 vector): {len(df) - int(r_hit):,} ({(len(df) - r_hit) / len(df):.1%})")
     (OUT_DIR / "summary.md").write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))
 

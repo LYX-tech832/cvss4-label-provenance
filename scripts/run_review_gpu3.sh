@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# 打乱标签对照的补充实验：
-#   5% v4 训练标签 + 打乱 v3.1 标签的辅助任务（时间划分，5 轮、inv_sqrt、λ=0.5，种子 0–2），
-#   用来检验要点第 4 条（5% 标签 + v3.1 辅助 ≈ 全部标签无辅助）靠的是 v3.1 信息还是样本池本身。
-# 等 run_review_gpu2.sh 跑完再开始，避免两个训练抢同一块 GPU。支持中断后续跑（--skip_existing）。
-# 汇总：python src/review_gpu2_summary.py（CPU）
+# Further shuffled-label control:
+#   5% of the v4 training labels + an auxiliary task with shuffled v3.1 labels (temporal split, 5 epochs, inv_sqrt, λ=0.5, seeds 0-2),
+#   to test whether the result "5% of the labels + v3.1 auxiliary task ≈ all labels without it" relies on the v3.1 information or on
+#   the sample pool itself.
+# Starts after run_review_gpu2.sh has finished, so that two trainings do not compete for the same GPU. Resumable after an interruption
+# (--skip_existing).
+# Summary: python src/review_gpu2_summary.py (CPU)
 set -o pipefail
 cd "$(dirname "$0")/.."
 while pgrep -f "run_review_gpu2[.]sh" > /dev/null; do sleep 60; done

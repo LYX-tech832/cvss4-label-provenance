@@ -1,6 +1,6 @@
-## 1. 按发布年份（CVE List V5 快照，PUBLISHED 记录）
+## 1. By publication year (CVE List V5 snapshot, PUBLISHED records)
 
-| 年份 | CVE 数 | CNA 给 v4.0 | CNA 给 v3.1 | CNA 同时给两版 | ADP 给 v3.1 | ADP 给 v4.0 | 完全无 v3.1/v4.0 |
+| Year | CVEs | CNA gives v4.0 | CNA gives v3.1 | CNA gives both | ADP gives v3.1 | ADP gives v4.0 | No v3.1/v4.0 at all |
 |---|---|---|---|---|---|---|---|
 | 2016 | 6,457 | 0 (0.0%) | 2 (0.0%) | 0 | 81 | 0 | 6,374 (98.7%) |
 | 2017 | 14,642 | 3 (0.0%) | 13 (0.1%) | 3 | 216 | 0 | 14,413 (98.4%) |
@@ -14,11 +14,11 @@
 | 2025 | 48,153 | 12,419 (25.8%) | 30,931 (64.2%) | 7,755 | 9,044 | 1 | 3,948 (8.2%) |
 | 2026 | 70,179 | 21,900 (31.2%) | 46,333 (66.0%) | 13,077 | 12,061 | 2 | 4,305 (6.1%) |
 
-全部年份合计：CNA 给 v4.0 的 CVE **37,997** 条；CNA 同时给 v3.1 和 v4.0 的 **23,473** 条；ADP 给 v4.0 的 3 条。
+All years: CVEs with a CNA-provided v4.0 vector **37,997**; with CNA-provided v3.1 and v4.0 vectors **23,473**; with an ADP-provided v4.0 vector 3.
 
-## 2. v4.0 标签来源（CNA shortName，共 300 个）
+## 2. Sources of the v4.0 labels (CNA shortName, 300 in total)
 
-| 来源 | 条数 | 占比 |
+| Source | CVEs | Share |
 |---|---|---|
 | VulDB | 12,882 | 33.9% |
 | VulnCheck | 7,429 | 19.6% |
@@ -33,24 +33,24 @@
 | qnap | 310 | 0.8% |
 | juniper | 273 | 0.7% |
 
-各年份前三来源：
-- 2017（3 条）：siemens 100.0%
-- 2020（5 条）：Google 80.0%；siemens 20.0%
-- 2021（10 条）：siemens 40.0%；Philips 30.0%；Nozomi 20.0%
-- 2022（30 条）：siemens 56.7%；VulDB 20.0%；Google 10.0%
-- 2023（53 条）：VulDB 41.5%；siemens 32.1%；Nozomi 20.8%
-- 2024（3,577 条）：VulDB 50.4%；GitHub_M 7.3%；siemens 5.8%
-- 2025（12,419 条）：VulDB 47.5%；GitHub_M 10.2%；VulnCheck 8.4%
-- 2026（21,900 条）：VulnCheck 29.2%；VulDB 23.5%；GitHub_M 16.4%
+Top three sources per year:
+- 2017 (3 CVEs): siemens 100.0%
+- 2020 (5 CVEs): Google 80.0%; siemens 20.0%
+- 2021 (10 CVEs): siemens 40.0%; Philips 30.0%; Nozomi 20.0%
+- 2022 (30 CVEs): siemens 56.7%; VulDB 20.0%; Google 10.0%
+- 2023 (53 CVEs): VulDB 41.5%; siemens 32.1%; Nozomi 20.8%
+- 2024 (3,577 CVEs): VulDB 50.4%; GitHub_M 7.3%; siemens 5.8%
+- 2025 (12,419 CVEs): VulDB 47.5%; GitHub_M 10.2%; VulnCheck 8.4%
+- 2026 (21,900 CVEs): VulnCheck 29.2%; VulDB 23.5%; GitHub_M 16.4%
 
-## 3. 同一 CVE 的多个 v4.0 标签
+## 3. Several v4.0 labels for the same CVE
 
-- CNA 容器内有 ≥2 个不同 v4.0 基础向量：57 条
-- CNA 与 ADP 都给了 v4.0：0 条
+- CNA container with ≥2 different v4.0 base vectors: 57 CVEs
+- Both the CNA and an ADP give a v4.0 vector: 0 CVEs
 
-## 4. 同一 CNA 同时给出的 v3.1–v4.0 对（23,473 对）
+## 4. v3.1–v4.0 pairs given by the same CNA (23,473 pairs)
 
-| 对应指标 | 一致率 |
+| Corresponding metrics | Agreement |
 |---|---|
 | v3.1 AV → v4.0 AV | 99.2% |
 | v3.1 AC → v4.0 AC | 97.9% |
@@ -59,17 +59,17 @@
 | v3.1 I → v4.0 VI | 96.5% |
 | v3.1 A → v4.0 VA | 98.6% |
 
-条件分布：
-- v3.1 UI=N（n=19,257）→ UI:N:97.8%，UI:P:1.1%，UI:A:1.1%
-- v3.1 UI=R（n=4,216）→ UI:P:67.3%，UI:A:21.0%，UI:N:11.6%
-- v3.1 AC=H（n=1,962）→ AT:N:53.6%，AT:P:46.4%
-- v3.1 AC=L（n=21,511）→ AT:N:96.8%，AT:P:3.2%
-- v3.1 S=C（n=2,089）→ 后续系统影响≠N:91.0%，后续系统影响=N:9.0%
-- v3.1 S=U（n=21,384）→ 后续系统影响=N:97.7%，后续系统影响≠N:2.3%
+Conditional distributions:
+- v3.1 UI=N (n=19,257) → UI:N:97.8%, UI:P:1.1%, UI:A:1.1%
+- v3.1 UI=R (n=4,216) → UI:P:67.3%, UI:A:21.0%, UI:N:11.6%
+- v3.1 AC=H (n=1,962) → AT:N:53.6%, AT:P:46.4%
+- v3.1 AC=L (n=21,511) → AT:N:96.8%, AT:P:3.2%
+- v3.1 S=C (n=2,089) → subsequent impacts≠N:91.0%, subsequent impacts=N:9.0%
+- v3.1 S=U (n=21,384) → subsequent impacts=N:97.7%, subsequent impacts≠N:2.3%
 
-规则换算 R 的整向量完全命中率：全部 81.3%；按来源（对数 ≥ 100）：
+Exact-vector hit rate of conversion rule R: all 81.3%; by source (at least 100 pairs):
 
-| 来源 | 对数 | R 完全命中 |
+| Source | Pairs | Exact hit of R |
 |---|---|---|
 | VulDB | 12,882 | 96.5% |
 | VulnCheck | 6,304 | 67.7% |
@@ -86,21 +86,21 @@
 | jpcert | 128 | 50.0% |
 | CERTVDE | 103 | 92.2% |
 
-## 5. v4.0 各指标类别分布（CNA 的第一个 v4.0 向量）
+## 5. Value distribution of each v4.0 metric (the CNA's first v4.0 vector)
 
-- AV：N=81.2%，L=14.2%，A=3.8%，P=0.8%
-- AC：L=91.9%，H=8.1%
-- AT：N=86.8%，P=13.2%
-- PR：N=49.7%，L=40.6%，H=9.7%
-- UI：N=79.1%，P=13.6%，A=7.3%
-- VC：H=37.6%，L=33.1%，N=29.3%
-- VI：L=37.6%，H=32.8%，N=29.6%
-- VA：N=38.4%，H=32.5%，L=29.1%
-- SC：N=83.6%，L=8.2%，H=8.1%
-- SI：N=84.7%，L=8.2%，H=7.1%
-- SA：N=90.7%，H=6.0%，L=3.3%
+- AV: N=81.2%, L=14.2%, A=3.8%, P=0.8%
+- AC: L=91.9%, H=8.1%
+- AT: N=86.8%, P=13.2%
+- PR: N=49.7%, L=40.6%, H=9.7%
+- UI: N=79.1%, P=13.6%, A=7.3%
+- VC: H=37.6%, L=33.1%, N=29.3%
+- VI: L=37.6%, H=32.8%, N=29.6%
+- VA: N=38.4%, H=32.5%, L=29.1%
+- SC: N=83.6%, L=8.2%, H=8.1%
+- SI: N=84.7%, L=8.2%, H=7.1%
+- SA: N=90.7%, H=6.0%, L=3.3%
 
-## 6. 文本与 CWE（v4.0 子集）
+## 6. Text and CWE (v4.0 subset)
 
-- 描述长度（字符）：中位数 385，P10 228，P90 701；缺描述 0 条
-- 带 CWE（CNA 或 ADP）：99.6%
+- Description length (characters): median 385, P10 228, P90 701; missing descriptions 0
+- With a CWE (CNA or ADP): 99.6%

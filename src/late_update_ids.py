@@ -1,10 +1,12 @@
-"""时间划分的历史信息可用性敏感性分析要排除的 CVE（CPU，读原始快照，约 5 分钟）。
+"""CVEs to exclude in the sensitivity analysis of the information available at the temporal cut-off (CPU, reads the raw snapshot,
+about 5 minutes).
 
-时间划分的训练数据（v4.0 训练与验证样本、v3.1 辅助样本池）都取自 2026-09-25 的最终快照。
-CVE List 不记录字段的历史版本，但每个容器有 providerMetadata.dateUpdated：容器的任何改动（描述、CWE、向量）都会更新它。
-这里列出 2026 年前发布、但 CNA 容器或任一 ADP 容器在截止日期（2026-01-01）及以后更新过的 CVE——
-它们的描述、CWE 或标签可能是截止日期后才写入的（是上限：任何改动都算）。
-输出：data/processed/late_updated_ids.json（{"v4": [...], "pool": [...], "counts": {...}}），train_encoder.py --exclude_ids 使用。
+The training data of the temporal split (v4.0 training and validation samples, v3.1 auxiliary pool) all come from the final snapshot of
+2026-09-25. The CVE List keeps no history of its fields, but each container has providerMetadata.dateUpdated, which any change of the
+container (description, CWE, vectors) updates. This script lists the CVEs published before 2026 whose CNA container or any ADP container
+was updated on or after the cut-off (2026-01-01): their description, CWE or labels may have been written after the cut-off (an upper
+bound, since any change counts).
+Output: data/processed/late_updated_ids.json ({"v4": [...], "pool": [...], "counts": {...}}), used by train_encoder.py --exclude_ids.
 """
 
 import json

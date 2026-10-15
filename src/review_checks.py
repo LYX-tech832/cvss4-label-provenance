@@ -1,14 +1,19 @@
-"""稳健性核查，第一批（CPU，几分钟）。
+"""Robustness checks, first set (CPU, a few minutes).
 
-① FD_oos 的稳健性：测试段里未见过的 v3.1 向量的比例（回退触发率）；三种回退方式（规则 R / 训练段最常见 v4 向量 / 不回退、只算见过的）
-   下的 FD_oos 与 0.90 分型是否改变；Wilson 95% 区间。分别用全部数据与 2026 年前数据（分型窗口）。
-② "最干净"子集：双版本评分且 v4.0 ≠ 规则 R(v3.1) 的 CVE。评测虚高（全部 / 非 derived / 干净子集）与排名翻转在该子集上是否成立。
-③ AutoCVSS 后处理：DONT_KNOW 改填训练集最常见值后，DeepSeek 与 TF-IDF 的差值（按标签类型，类型内配对 bootstrap）。
-④ CVSS v4.0 打分的单调性：把任一指标调严重一级，CVSS-B 分数与严重等级是否可能下降（穷举全部 104,976 个基础向量）。
-⑤ v3.1 辅助池中 CNA 与 ADP 标签的比例。
-⑥ 各划分内，5 个种子中有辅助版本胜出的个数。
-⑦ 时间泄漏上限：发布于 2026 年前、但记录在 2026 年后更新过的 v4 训练样本与分型样本的比例（记录级更新时间，是上限）。
-输出：results/review_checks/summary.md
+(a) Robustness of FD_oos: share of v3.1 vectors in the test segment not seen in the training segment (fallback rate); FD_oos and the
+    typing at 0.90 under three fallbacks (rule R / the most frequent v4 vector of the training segment / no fallback, seen vectors only);
+    Wilson 95% intervals. On all data and on data before 2026 (the typing window).
+(b) The R-inconsistent subset: dual-scored CVEs whose v4.0 vector differs from rule R(v3.1). Do the evaluation inflation (all /
+    non-derived / this subset) and the ranking reversal hold on it?
+(c) AutoCVSS post-processing: the difference between DeepSeek and TF-IDF when DONT_KNOW is replaced by the most frequent training value
+    (by label type, paired bootstrap within types).
+(d) Monotonicity of CVSS v4.0 scoring: can the CVSS-B score or band decrease when any metric is made one step more severe (exhaustive
+    over all 104,976 base vectors)?
+(e) Shares of CNA and ADP labels in the v3.1 auxiliary pool.
+(f) Within each split, the number of the 5 seeds on which the auxiliary variant wins.
+(g) Upper bound of temporal leakage: share of v4 training and typing samples published before 2026 whose record was updated after the
+    start of 2026 (record-level update time, hence an upper bound).
+Output: results/review_checks/summary.md
 """
 
 import itertools
@@ -65,12 +70,12 @@ def fd_variants(pairs):
 
 
 def part1(df, lines):
-    lines += ["\n## ① FD_oos 的回退方式与置信区间\n",
-              "回退 = 测试段（后 30%）里训练段没见过的 v3.1 向量所占比例。三种回退：规则 R（论文所用）/ 训练段最常见的 v4 向量 / 不回退（只算见过的）。",
-              "区间为规则 R 回退下的 Wilson 95% 区间。\n"]
-    for name, sub in [("全部数据", df), ("2026 年前（分型窗口）", df[df["pub"] < CUTOFF])]:
+    lines += ["\n## (a) Fallbacks of FD_oos and confidence intervals\n",
+              "Fallback = share of v3.1 vectors in the test segment (the last 30%) not seen in the training segment. Three fallbacks: rule R (used in the paper) / the most frequent v4 vector of the training segment / none (seen vectors only). ",
+              "Intervals are Wilson 95% intervals with the rule-R fallback.\n"]
+    for name, sub in [("all data", df), ("before 2026 (typing window)", df[df["pub"] < CUTOFF])]:
         pairs = collect(sub)
-        lines += [f"\n### {name}\n", "| CNA | 对数 | 测试段 n | 回退触发率 | FD_oos（规则 R 回退） | 95% 区间 | FD_oos（最常见值回退） | FD_oos（只算见过的） | 0.90 分型是否随回退方式改变 |",
+        lines += [f"\n### {name}\n", "| CNA | Pairs | Test segment n | Fallback rate | FD_oos (rule-R fallback) | 95% interval | FD_oos (most-frequent fallback) | FD_oos (seen only) | Typing at 0.90 changes with the fallback |",
                   "|---|---|---|---|---|---|---|---|---|"]
         for s, p in sorted(pairs.items(), key=lambda x: -len(x[1])):
             if len(p) < 100:
@@ -78,11 +83,11 @@ def part1(df, lines):
             r = fd_variants(p)
             types = {v >= 0.90 for v in [r["fd_R"], r["fd_maj"]] + ([r["fd_seen"]] if not np.isnan(r["fd_seen"]) else [])}
             lines.append(f"| {s} | {len(p):,} | {r['n_test']} | {r['fallback']:.1%} | {r['fd_R']:.1%} | [{r['ci'][0]:.1%}, {r['ci'][1]:.1%}] | "
-                         f"{r['fd_maj']:.1%} | {r['fd_seen']:.1%} | {'**是**' if len(types) > 1 else '否'} |")
+                         f"{r['fd_maj']:.1%} | {r['fd_seen']:.1%} | {'**yes**' if len(types) > 1 else 'no'} |")
 
 
 def clean_mask(df):
-    """双版本评分且 v4.0 向量 ≠ 规则 R(同来源 v3.1)。"""
+    """Dual-scored and the v4.0 vector differs from rule R(same-source v3.1)."""
     out = np.zeros(len(df), bool)
     for i, (_, r) in enumerate(df.iterrows()):
         if not r["has_v31"]:
@@ -106,15 +111,15 @@ def part2_3(df, lines):
     test["clean"] = clean_mask(test)
     tfidf = aligned(PRED / "T2_temporal_tfidf_lr.parquet", test["cve_id"])
     aux = [aligned(f, test["cve_id"]) for f in sorted(ENC.glob("T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s[0-9]/pred_latent.parquet"))]
-    lines += ["\n## ② \"最干净\"子集：双版本评分且 v4.0 ≠ 规则 R(v3.1)\n",
-              f"时间划分测试集：全部 {len(test):,}；非 derived {int((test['label_type'] != 'derived').sum()):,}；干净子集 {int(test['clean'].sum()):,}"
-              f"（其中 derived 标签 {int((test['clean'] & (test['label_type'] == 'derived')).sum())} 条）。\n",
-              "| 方法 | 口径 | n | 平均宏 F1 | 等级准确率 |", "|---|---|---|---|---|"]
-    for scope, m in [("全部", np.ones(len(test), bool)), ("非 derived", (test["label_type"] != "derived").to_numpy()), ("干净子集", test["clean"].to_numpy())]:
+    lines += ["\n## (b) The R-inconsistent subset: dual-scored and v4.0 ≠ rule R(v3.1)\n",
+              f"Temporal split test set: all {len(test):,}; non-derived {int((test['label_type'] != 'derived').sum()):,}; R-inconsistent subset {int(test['clean'].sum()):,}"
+              f" (of which derived labels {int((test['clean'] & (test['label_type'] == 'derived')).sum())}).\n",
+              "| Method | Scope | n | Mean macro-F1 | Band accuracy |", "|---|---|---|---|---|"]
+    for scope, m in [("all", np.ones(len(test), bool)), ("non-derived", (test["label_type"] != "derived").to_numpy()), ("R-inconsistent subset", test["clean"].to_numpy())]:
         f, b = scores(test[m], tfidf[m])
         lines.append(f"| TF-IDF + LR | {scope} | {int(m.sum()):,} | {f:.3f} | {b:.3f} |")
         rs = [scores(test[m], p[m]) for p in aux]
-        lines.append(f"| DeBERTa + v3.1 辅助（5 种子均值） | {scope} | {int(m.sum()):,} | {np.mean([r[0] for r in rs]):.3f} | {np.mean([r[1] for r in rs]):.3f} |")
+        lines.append(f"| DeBERTa + v3.1 auxiliary (mean of 5 seeds) | {scope} | {int(m.sum()):,} | {np.mean([r[0] for r in rs]):.3f} | {np.mean([r[1] for r in rs]):.3f} |")
 
     # LLM 样本
     llm = pd.read_parquet(LLM / "predictions.parquet")
@@ -130,17 +135,17 @@ def part2_3(df, lines):
     for cve, k in unknown:
         if cve in pos:
             alt.iloc[pos[cve], alt.columns.get_loc(k)] = majority[k]
-    methods = {"DeepSeek（原做法）": llm.set_index("cve_id").loc[ids].reset_index(), "DeepSeek（DONT_KNOW→最常见值）": alt,
+    methods = {"DeepSeek (as in AutoCVSS)": llm.set_index("cve_id").loc[ids].reset_index(), "DeepSeek (DONT_KNOW → most frequent)": alt,
                "TF-IDF": aligned(PRED / "T2_temporal_tfidf_lr.parquet", ids)}
     t = Encoded(s, "y_")
     enc = {n: Encoded(p) for n, p in methods.items()}
     lt = s["label_type"].to_numpy()
     rng = np.random.default_rng(0)
-    scopes = {"样本整体": ["derived", "independent", "v4_only", "other"], "去掉 derived": ["independent", "v4_only", "other"],
+    scopes = {"whole sample": ["derived", "independent", "v4_only", "other"], "without derived": ["independent", "v4_only", "other"],
               "independent": ["independent"], "v4_only": ["v4_only"], "other": ["other"], "derived": ["derived"]}
-    lines += ["\n## ③ AutoCVSS 后处理：DONT_KNOW → 训练集最常见值（同一批 2,000 条；类型内配对 bootstrap 1,000 次）\n",
-              f"DONT_KNOW 或失败的（CVE, 指标）对：{len(unknown):,}（占 {len(unknown) / (len(ids) * 11):.1%}）。\n",
-              "| 口径 | n | DeepSeek 原做法 宏F1 / 等级 | DeepSeek 最常见值 宏F1 / 等级 | TF-IDF 宏F1 / 等级 | (最常见值 − TF-IDF) 宏F1 差 [95%] | 等级准确率差 [95%] |",
+    lines += ["\n## (c) AutoCVSS post-processing: DONT_KNOW → most frequent training value (the same 2,000 CVEs; paired bootstrap within types, 1,000 resamples)\n",
+              f"(CVE, metric) pairs with DONT_KNOW or a failed request: {len(unknown):,} ({len(unknown) / (len(ids) * 11):.1%}).\n",
+              "| Scope | n | DeepSeek as in AutoCVSS macro-F1 / band | DeepSeek most frequent macro-F1 / band | TF-IDF macro-F1 / band | (most frequent − TF-IDF) macro-F1 difference [95%] | Band accuracy difference [95%] |",
               "|---|---|---|---|---|---|---|"]
     for name, types in scopes.items():
         strata = [np.flatnonzero(lt == ty) for ty in types]
@@ -149,13 +154,13 @@ def part2_3(df, lines):
         diffs = []
         for _ in range(1000):
             b = np.concatenate([rng.choice(x, size=len(x), replace=True) for x in strata])
-            a, c = fast_scores(t, enc["DeepSeek（DONT_KNOW→最常见值）"], b), fast_scores(t, enc["TF-IDF"], b)
+            a, c = fast_scores(t, enc["DeepSeek (DONT_KNOW → most frequent)"], b), fast_scores(t, enc["TF-IDF"], b)
             diffs.append((a["mean_macro_f1"] - c["mean_macro_f1"], a["band_acc"] - c["band_acc"]))
         d = np.array(diffs)
         cell = lambda n: f"{pt[n]['mean_macro_f1']:.3f} / {pt[n]['band_acc']:.3f}"  # noqa: E731
-        df1 = pt["DeepSeek（DONT_KNOW→最常见值）"]["mean_macro_f1"] - pt["TF-IDF"]["mean_macro_f1"]
-        db = pt["DeepSeek（DONT_KNOW→最常见值）"]["band_acc"] - pt["TF-IDF"]["band_acc"]
-        lines.append(f"| {name} | {len(idx):,} | {cell('DeepSeek（原做法）')} | {cell('DeepSeek（DONT_KNOW→最常见值）')} | {cell('TF-IDF')} | "
+        df1 = pt["DeepSeek (DONT_KNOW → most frequent)"]["mean_macro_f1"] - pt["TF-IDF"]["mean_macro_f1"]
+        db = pt["DeepSeek (DONT_KNOW → most frequent)"]["band_acc"] - pt["TF-IDF"]["band_acc"]
+        lines.append(f"| {name} | {len(idx):,} | {cell('DeepSeek (as in AutoCVSS)')} | {cell('DeepSeek (DONT_KNOW → most frequent)')} | {cell('TF-IDF')} | "
                      f"{df1:+.3f} [{np.percentile(d[:, 0], 2.5):+.3f}, {np.percentile(d[:, 0], 97.5):+.3f}] | "
                      f"{db:+.3f} [{np.percentile(d[:, 1], 2.5):+.3f}, {np.percentile(d[:, 1], 97.5):+.3f}] |")
     # 干净子集上的 LLM 对比（原做法）
@@ -164,11 +169,11 @@ def part2_3(df, lines):
     diffs = []
     for _ in range(1000):
         b = rng.choice(idx, size=len(idx), replace=True)
-        diffs.append(fast_scores(t, enc["DeepSeek（原做法）"], b)["mean_macro_f1"] - fast_scores(t, enc["TF-IDF"], b)["mean_macro_f1"])
-    a, c = fast_scores(t, enc["DeepSeek（原做法）"], idx), fast_scores(t, enc["TF-IDF"], idx)
-    lines.append(f"\n样本中的干净子集（n = {len(idx)}）：DeepSeek（原做法）宏 F1 {a['mean_macro_f1']:.3f} / 等级 {a['band_acc']:.3f}；"
-                 f"TF-IDF {c['mean_macro_f1']:.3f} / {c['band_acc']:.3f}；宏 F1 差 {a['mean_macro_f1'] - c['mean_macro_f1']:+.3f} "
-                 f"[{np.percentile(diffs, 2.5):+.3f}, {np.percentile(diffs, 97.5):+.3f}]。")
+        diffs.append(fast_scores(t, enc["DeepSeek (as in AutoCVSS)"], b)["mean_macro_f1"] - fast_scores(t, enc["TF-IDF"], b)["mean_macro_f1"])
+    a, c = fast_scores(t, enc["DeepSeek (as in AutoCVSS)"], idx), fast_scores(t, enc["TF-IDF"], idx)
+    lines.append(f"\nR-inconsistent subset of the sample (n = {len(idx)}): DeepSeek (as in AutoCVSS) macro-F1 {a['mean_macro_f1']:.3f} / band {a['band_acc']:.3f}; "
+                 f"TF-IDF {c['mean_macro_f1']:.3f} / {c['band_acc']:.3f}; macro-F1 difference {a['mean_macro_f1'] - c['mean_macro_f1']:+.3f} "
+                 f"[{np.percentile(diffs, 2.5):+.3f}, {np.percentile(diffs, 97.5):+.3f}].")
 
 
 def part4(lines):
@@ -188,20 +193,20 @@ def part4(lines):
                 viol_score[k] += 1
             if SEVERITY_ORDER.get(b1, -1) < SEVERITY_ORDER.get(b0, -1):
                 viol_band[k] += 1
-    lines += ["\n## ④ CVSS v4.0 打分的单调性（穷举全部基础向量，逐指标调严重一级）\n",
-              f"检查的（向量, 指标）组合：{total:,}；分数下降的：{sum(viol_score.values()):,}（按指标：{dict(viol_score) or '无'}）；"
-              f"严重等级下降的：{sum(viol_band.values()):,}（按指标：{dict(viol_band) or '无'}）。"]
+    lines += ["\n## (d) Monotonicity of CVSS v4.0 scoring (all base vectors, each metric made one step more severe)\n",
+              f"(vector, metric) combinations checked: {total:,}; with a lower score: {sum(viol_score.values()):,} (by metric: {dict(viol_score) or 'none'}); "
+              f"with a lower band: {sum(viol_band.values()):,} (by metric: {dict(viol_band) or 'none'})."]
 
 
 def part5(lines):
     pool = v31_pool(before_cutoff=True)
     cna = pool["cna_v31"].map(len) > 0
-    lines += ["\n## ⑤ v3.1 辅助池的标签来源（2026 年前）\n",
-              f"共 {len(pool):,} 条：来自 CNA 容器 {int(cna.sum()):,}（{cna.mean():.1%}），来自 ADP 容器 {int((~cna).sum()):,}（{(~cna).mean():.1%}）。"]
+    lines += ["\n## (e) Sources of the labels in the v3.1 auxiliary pool (before 2026)\n",
+              f"{len(pool):,} in total: from CNA containers {int(cna.sum()):,} ({cna.mean():.1%}), from ADP containers {int((~cna).sum()):,} ({(~cna).mean():.1%})."]
 
 
 def part6(lines):
-    lines += ["\n## ⑥ 各划分内有辅助版本胜出的种子数（平均宏 F1，全部测试集）\n", "| 划分 | 胜出种子数 / 5 | 各种子差值 |", "|---|---|---|"]
+    lines += ["\n## (f) Seeds on which the auxiliary variant wins, within each split (mean macro-F1, all test labels)\n", "| Split | Winning seeds / 5 | Difference per seed |", "|---|---|---|"]
     for split in ["temporal", "loso-VulnCheck", "loso-GitHub_M", "loso-VulDB"]:
         d = []
         for s in range(5):
@@ -217,17 +222,17 @@ def part7(df, lines):
     pre = df["pub"] < CUTOFF
     late = upd >= CUTOFF
     dual = df["has_v31"]
-    lines += ["\n## ⑦ 时间泄漏的上限（记录级更新时间；记录更新不一定是 v4.0 向量的改动，所以是上限）\n",
-              f"- 2026 年前发布的 v4 样本（时间划分的训练 + 验证部分）：{int(pre.sum()):,} 条，其中记录在 2026 年后更新过的 {int((pre & late).sum()):,} 条（{(pre & late).sum() / pre.sum():.1%}）；",
-              f"- 其中双版本评分（分型所用）的：{int((pre & dual).sum()):,} 条，2026 年后更新过的 {int((pre & dual & late).sum()):,} 条（{(pre & dual & late).sum() / (pre & dual).sum():.1%}）；",
-              "- 按来源（2026 年后更新过的比例，训练部分 v4 样本数 ≥ 500 的来源）：" + "；".join(
+    lines += ["\n## (g) Upper bound of temporal leakage (record-level update time; a record update is not necessarily a change of the v4.0 vector, hence an upper bound)\n",
+              f"- v4 samples published before 2026 (training + validation parts of the temporal split): {int(pre.sum()):,}, of which {int((pre & late).sum()):,} with a record updated after the start of 2026 ({(pre & late).sum() / pre.sum():.1%}); ",
+              f"- of these, dual-scored (used for the typing): {int((pre & dual).sum()):,}, updated after the start of 2026 {int((pre & dual & late).sum()):,} ({(pre & dual & late).sum() / (pre & dual).sum():.1%}); ",
+              "- by source (share updated after the start of 2026, sources with at least 500 v4 samples in the training part): " + "; ".join(
                   f"{s} {g:.1%}" for s, g in df[pre].assign(late=late[pre]).groupby("source")["late"].agg(["mean", "size"]).query("size >= 500")["mean"].sort_values(ascending=False).items())]
 
 
 def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
-    lines = ["# 稳健性核查（第一批，自动生成）\n"]
+    lines = ["# Robustness checks (first set, generated automatically)\n"]
     part1(df, lines)
     part2_3(df, lines)
     part4(lines)

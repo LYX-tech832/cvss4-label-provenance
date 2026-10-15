@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# 补充 GPU 实验（留一来源划分上步数相当的基线、顺序微调、打乱标签对照、最早 5% 标签）。用法：bash scripts/run_review_gpu5.sh [阶段…]（不带参数 = D0 A B C）
-#   D0. 留一来源划分上步数相当的无辅助基线，先只跑种子 0（VulnCheck 16 轮、GitHub 15 轮、VulDB 18 轮；类别加权）。
-#       轮数 = 5 ×（v4 训练样本 + 6 万辅助样本）/ v4 训练样本，与辅助模型 5 轮的优化步数相当（时间划分上对应的是已有的 25 轮）。
-#       它作为无辅助模型的一个候选配置，和原有候选一起按各划分自己的验证集选（src/select_loso_config.py）。约 1.8 小时。
-#   A.  顺序微调基线（时间划分）：第一阶段只用 v3.1 池训练 v3.1 头并保存编码器（--v31_only --save_encoder，5 轮）；
-#       第二阶段从这个编码器出发只用 v4 标签微调（--init_encoder；种子 0 跑 5 / 10 / 25 轮，按验证集选一个，再跑种子 1–2）。约 2.2–3 小时。
-#   B.  留一来源划分上的打乱标签对照（--aux_shuffle，配置同各划分选中的辅助模型：λ=1、类别加权、5 轮；种子 0–2）。约 5.3 小时。
-#   C.  最早的 5% v4 标签（--frac_mode earliest，种子 0–2）：辅助 5 轮；无辅助 50 轮（与随机 5% 的做法相同）。约 1.3 小时。
-#   D1.（D0 之后按需）每个划分选中的配置跑满种子 0–4；只有 D0 的配置在某个划分被选中时才会有新的训练（每个划分 4 次、约 2.4 小时）。
-# 时间按 RTX 4090 估计。支持中断后续跑（--skip_existing）。
+# Additional GPU runs (step-matched baselines on the leave-one-source-out splits, sequential fine-tuning, shuffled-label control,
+# earliest 5% of the labels). Usage: bash scripts/run_review_gpu5.sh [stage...] (no argument = D0 A B C)
+#   D0. Step-matched baselines on the leave-one-source-out splits, seed 0 first (VulnCheck 16 epochs, GitHub 15, VulDB 18; class-weighted).
+#       Epochs = 5 × (v4 training samples + 60,000 auxiliary samples) / v4 training samples, as many optimisation steps as the auxiliary
+#       model's 5 epochs (on the temporal split this is the existing 25 epochs). It is one more candidate configuration of the baseline
+#       and is selected together with the other candidates on each split's own validation set (src/select_loso_config.py). About 1.8 hours.
+#   A.  Sequential fine-tuning baseline (temporal split): stage 1 trains the v3.1 heads on the v3.1 pool only and saves the encoder
+#       (--v31_only --save_encoder, 5 epochs); stage 2 fine-tunes from this encoder on the v4 labels only (--init_encoder; seed 0 with
+#       5 / 10 / 25 epochs, one selected on the validation set, then seeds 1-2). About 2.2-3 hours.
+#   B.  Shuffled-label control on the leave-one-source-out splits (--aux_shuffle, configuration as the auxiliary model selected on each
+#       split: λ=1, class weighting, 5 epochs; seeds 0-2). About 5.3 hours.
+#   C.  The earliest 5% of the v4 labels (--frac_mode earliest, seeds 0-2): auxiliary 5 epochs; baseline 50 epochs (as for a random 5%).
+#       About 1.3 hours.
+#   D1. (after D0, if needed) seeds 0-4 for the configuration selected on each split; new training happens only where a D0
+#       configuration is selected (4 runs per split, about 2.4 hours).
+# Times estimated for an RTX 4090. Resumable after an interruption (--skip_existing).
 set -o pipefail
 cd "$(dirname "$0")/.."
 source /usr/local/miniconda3/bin/activate py312 2>/dev/null || true

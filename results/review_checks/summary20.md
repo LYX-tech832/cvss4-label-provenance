@@ -1,10 +1,10 @@
-# 辅助任务模型（5 轮）− 基线编码器（25 轮，表 7 选中），按子集（自动生成）
+# Auxiliary-task model (5 epochs) − baseline encoder (25 epochs, selected for Table 2), by subset (generated automatically)
 
-种子数：辅助 5，基线 5。配对 bootstrap，测试 CVE 重抽样 1,000 次。
+Seeds: auxiliary 5, baseline 5. Paired bootstrap, test CVEs resampled 1,000 times.
 
-| 子集 | n | 平均宏 F1 差 | 等级准确率差 |
+| Subset | n | Mean macro-F1 difference | Band accuracy difference |
 |---|---|---|---|
-| 全部 | 21,900 | +0.025 [+0.023, +0.026] | +0.019 [+0.016, +0.022] |
-| 非 derived | 16,749 | +0.026 [+0.024, +0.028] | +0.024 [+0.020, +0.028] |
+| all | 21,900 | +0.025 [+0.023, +0.026] | +0.019 [+0.016, +0.022] |
+| non-derived | 16,749 | +0.026 [+0.024, +0.028] | +0.024 [+0.020, +0.028] |
 | R-inconsistent | 2,602 | +0.023 [+0.018, +0.027] | +0.024 [+0.015, +0.033] |
-| 无同来源 v3.1 | 8,823 | +0.027 [+0.024, +0.029] | +0.021 [+0.015, +0.026] |
+| no same-source v3.1 | 8,823 | +0.027 [+0.024, +0.029] | +0.021 [+0.015, +0.026] |

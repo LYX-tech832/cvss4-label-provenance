@@ -1,8 +1,8 @@
-# 流水线基线：描述 → v3.1（TF-IDF+LR）→ v4.0（规则换算）；不使用任何 v4.0 标签
+# Pipeline baseline: description -> v3.1 (TF-IDF+LR) -> v4.0 (rule-based conversion); no v4.0 labels used
 
-单元格 = 平均F1 / 全对 / 等级准确率 / 低估率
+Cell = mean F1 / exact / band accuracy / underestimation rate
 
-| 划分 | 换算 | 全部 | 去掉 derived | independent | v4_only | other |
+| Split | Conversion | All | Without derived | independent | v4_only | other |
 |---|---|---|---|---|---|---|
 | temporal | rule_R | 0.565 / 0.167 / 0.541 / 0.127 | 0.546 / 0.164 / 0.539 / 0.150 | 0.579 / 0.226 / 0.594 / 0.121 | 0.501 / 0.104 / 0.486 / 0.180 | 0.524 / 0.128 / 0.506 / 0.165 |
 | temporal | vieira_like | 0.519 / 0.165 / 0.545 / 0.132 | 0.498 / 0.161 / 0.545 / 0.156 | 0.516 / 0.214 / 0.599 / 0.125 | 0.458 / 0.107 / 0.491 / 0.191 | 0.493 / 0.130 / 0.514 / 0.169 |

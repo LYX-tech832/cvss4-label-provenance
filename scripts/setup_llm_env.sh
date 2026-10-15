@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# 在 GPU 服务器上准备本地开源大模型基线的环境。只用网络和磁盘、不占 GPU，可以在 W4 运行时执行。
-#   /root/venv-vllm        vLLM 推理服务（独立环境，不影响训练用的 py312）
-#   /root/venv-llmclient   AutoCVSS 驱动脚本的客户端（继承 py312 的 pandas 等，另装 instructor / openai / langfuse<3）
-#   /root/models/Qwen3-8B  模型权重（经 hf-mirror 下载；Apache-2.0 许可）
-# 用法（在项目根目录）：setsid nohup bash scripts/setup_llm_env.sh > setup_llm.out 2>&1 < /dev/null &
+# Prepares the environment for the local open-weight LLM baseline on the GPU server. Uses only network and disk, not the GPU, so it can
+# run while W4 is running.
+#   /root/venv-vllm        vLLM inference server (separate environment, does not affect py312 used for training)
+#   /root/venv-llmclient   client for the AutoCVSS driver script (inherits pandas etc. from py312; adds instructor / openai / langfuse<3)
+#   /root/models/Qwen3-8B  model weights (downloaded through hf-mirror; Apache-2.0 licence)
+# Usage (from the project root): setsid nohup bash scripts/setup_llm_env.sh > setup_llm.out 2>&1 < /dev/null &
 set -e
 PY=/usr/local/miniconda3/envs/py312/bin/python
 export HF_ENDPOINT=https://hf-mirror.com

@@ -1,14 +1,16 @@
-"""来源可预测性、回填与按来源宏平均的 CPU 分析（约 10 分钟）：
+"""Predictability by source, back-filling and source-macro averages (CPU, about 10 minutes):
 
-A. 决定性对照：VulDB 的 v3.1 标签是否同样比其他来源容易预测？
-   同一批 CVE、同一个模型（TF-IDF + LR）、同样的训练/测试划分（T1 的双版本评分 CVE：2026 年前训练，2026 年测试），
-   分别预测同一 CNA 给的 v3.1 向量和 v4.0 向量，按来源报告严重性等级的基率、准确率、Cohen's κ 和平均宏 F1。
-   如果 VulDB 的 v3.1 标签同样更容易预测，评测差异就是来源效应，而不是 v4.0 标签"派生"造成的。
-B. VulnCheck 的回填：时间划分测试集中各来源的 CVE 编号年份分布。
-C. 按来源宏平均：时间划分测试集上，各来源（≥ 30 条测试 CVE）等权平均后的结果与辅助任务的增益。
-D. T1 测试集的标签类型构成（问题 9）。
-E. 去掉回填的测试 CVE（编号年份早于 2025）后的主要结果。
-输出：results/review_checks/summary10.md
+A. Decisive control: are VulDB's v3.1 labels also easier to predict than those of other sources?
+   The same CVEs, the same model (TF-IDF + LR) and the same training/test split (the dual-scored CVEs of T1: training before 2026, test
+   in 2026) predict the same CNA's v3.1 vector and its v4.0 vector; reported per source: base rate of the severity band, band accuracy,
+   Cohen's κ and mean macro-F1. If VulDB's v3.1 labels are just as much easier to predict, the evaluation difference is a source effect
+   and not caused by the derivation of the v4.0 labels.
+B. Back-filling by VulnCheck: distribution of the CVE identifier years in the temporal split test set by source.
+C. Source-macro averages: results on the temporal split test set with equal weight for each source (at least 30 test CVEs), and the
+   gain of the auxiliary task.
+D. Label types of the T1 test set.
+E. Main results without the back-filled test CVEs (identifier year before 2025).
+Output: results/review_checks/summary10.md
 """
 
 import sys
@@ -61,11 +63,11 @@ def part_a(df, lines):
     t40 = te[["y_" + k for k in M40]].set_axis(M40, axis=1)
     b31t, b31p = band31(te, "x31_"), band31(p31.add_prefix("p_"), "p_")
     e_t, e_p = Encoded(te, "y_"), Encoded(p40.assign(cve_id=te["cve_id"]))
-    lines += ["## A. 同一批 CVE 上，v3.1 标签与 v4.0 标签的可预测性（TF-IDF + LR；T1 的双版本评分 CVE）\n",
-              f"训练：2026 年前的双版本评分 CVE {len(tr):,} 条；测试：2026 年的 {len(te):,} 条。两个模型的输入、训练 CVE、测试 CVE 完全相同，只是标签换了版本。\n",
-              "| 测试标签的来源 | n | v3.1：基率 / 等级准确率 / κ / 平均宏 F1（8 指标） | v4.0：基率 / 等级准确率 / κ / 平均宏 F1（11 指标） |", "|---|---|---|---|"]
-    groups = [("VulDB", (te["source"] == "VulDB").to_numpy()), ("其他来源合计", (te["source"] != "VulDB").to_numpy()),
-              ("VulnCheck", (te["source"] == "VulnCheck").to_numpy()), ("VulDB、VulnCheck 以外", (~te["source"].isin(["VulDB", "VulnCheck"])).to_numpy())]
+    lines += ["## A. Predictability of the v3.1 and the v4.0 labels of the same CVEs (TF-IDF + LR; the dual-scored CVEs of T1)\n",
+              f"Training: {len(tr):,} dual-scored CVEs before 2026; test: {len(te):,} in 2026. Input, training CVEs and test CVEs are identical for both models; only the version of the labels differs.\n",
+              "| Source of the test labels | n | v3.1: base rate / band accuracy / κ / mean macro-F1 (8 metrics) | v4.0: base rate / band accuracy / κ / mean macro-F1 (11 metrics) |", "|---|---|---|---|"]
+    groups = [("VulDB", (te["source"] == "VulDB").to_numpy()), ("all other sources", (te["source"] != "VulDB").to_numpy()),
+              ("VulnCheck", (te["source"] == "VulnCheck").to_numpy()), ("other than VulDB and VulnCheck", (~te["source"].isin(["VulDB", "VulnCheck"])).to_numpy())]
     for name, m in groups:
         idx = np.flatnonzero(m)
         base31 = np.bincount(b31t[idx]).max() / len(idx)
@@ -78,14 +80,14 @@ def part_a(df, lines):
         k40 = cohen_kappa_score(tb, pb)
         f40 = macro_f1(t40.iloc[idx], p40.iloc[idx], V40_METRICS)
         lines.append(f"| {name} | {len(idx):,} | {base31:.3f} / {acc31:.3f} / {k31:.3f} / {f31:.3f} | {base40:.3f} / {acc40:.3f} / {k40:.3f} / {f40:.3f} |")
-    lines.append("\n（宏 F1 在每个指标的全部取值上平均，未出现的取值记 0，与论文口径一致。）")
+    lines.append("\n(Macro-F1 is averaged over all values of each metric; values that do not occur score 0, as in the paper.)")
 
 
 def part_b(test, lines):
     yr = test["cve_id"].str.extract(r"CVE-(\d{4})-")[0].astype(int)
-    lines += ["\n## B. 时间划分测试集（2026 年发布）的 CVE 编号年份\n", "| 来源 | n | 编号年份 < 2025 | 编号年份 = 2025 | 编号年份 = 2026 |", "|---|---|---|---|---|"]
+    lines += ["\n## B. CVE identifier years in the temporal split test set (published in 2026)\n", "| Source | n | Identifier year < 2025 | Identifier year = 2025 | Identifier year = 2026 |", "|---|---|---|---|---|"]
     for name, m in [("VulnCheck", test["source"] == "VulnCheck"), ("VulDB", test["source"] == "VulDB"), ("GitHub_M", test["source"] == "GitHub_M"),
-                    ("其他来源", ~test["source"].isin(["VulnCheck", "VulDB", "GitHub_M"])), ("全部", pd.Series(True, index=test.index))]:
+                    ("other sources", ~test["source"].isin(["VulnCheck", "VulDB", "GitHub_M"])), ("all", pd.Series(True, index=test.index))]:
         y = yr[m]
         lines.append(f"| {name} | {int(m.sum()):,} | {(y < 2025).mean():.1%} | {(y == 2025).mean():.1%} | {(y == 2026).mean():.1%} |")
 
@@ -96,13 +98,13 @@ def part_c(test, lines):
 
     def enc(path):
         return Encoded(pd.read_parquet(path).set_index("cve_id").loc[ids].reset_index())
-    methods = {"多数类": [enc(ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_majority.parquet")],
+    methods = {"majority class": [enc(ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_majority.parquet")],
                "TF-IDF + LR": [enc(ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_tfidf_lr.parquet")],
-               "DeBERTa（25 轮）": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
-               "DeBERTa + 辅助": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
+               "DeBERTa (25 epochs)": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
+               "DeBERTa + auxiliary": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
     src = test["source"].to_numpy()
     counts = test["source"].value_counts()
-    lines.append("\n## C. 按来源宏平均（时间划分测试集；每个来源等权）\n")
+    lines.append("\n## C. Source-macro averages (temporal split test set; equal weight per source)\n")
     for min_n in (30, 100):
         keep = [s for s, n in counts.items() if n >= min_n]
         per = {m: {} for m in methods}
@@ -112,16 +114,16 @@ def part_c(test, lines):
                 rs = [fast_scores(t, e, idx) for e in es]
                 per[m][s] = {k: np.mean([r[k] for r in rs]) for k in ("mean_macro_f1", "band_acc", "under_rate")}
         n_cve = int(sum(counts[s] for s in keep))
-        lines += [f"\n测试 CVE ≥ {min_n} 条的来源：{len(keep)} 个（覆盖 {n_cve:,} / {len(test):,} 条）\n", "| 方法 | 平均宏 F1 | 等级准确率 | 低估率 |", "|---|---|---|---|"]
+        lines += [f"\nSources with at least {min_n} test CVEs: {len(keep)} (covering {n_cve:,} / {len(test):,} CVEs)\n", "| Method | Mean macro-F1 | Band accuracy | Underestimation |", "|---|---|---|---|"]
         for m in methods:
             lines.append(f"| {m} | " + " | ".join(f"{np.mean([per[m][s][k] for s in keep]):.3f}" for k in ("mean_macro_f1", "band_acc", "under_rate")) + " |")
-        d = np.array([per["DeBERTa + 辅助"][s]["mean_macro_f1"] - per["DeBERTa（25 轮）"][s]["mean_macro_f1"] for s in keep])
-        db = np.array([per["DeBERTa + 辅助"][s]["band_acc"] - per["DeBERTa（25 轮）"][s]["band_acc"] for s in keep])
+        d = np.array([per["DeBERTa + auxiliary"][s]["mean_macro_f1"] - per["DeBERTa (25 epochs)"][s]["mean_macro_f1"] for s in keep])
+        db = np.array([per["DeBERTa + auxiliary"][s]["band_acc"] - per["DeBERTa (25 epochs)"][s]["band_acc"] for s in keep])
         bs = np.array([[d[i].mean(), db[i].mean()] for i in (rng.integers(len(keep), size=len(keep)) for _ in range(2000))])
-        lines.append(f"\n辅助 − DeBERTa（25 轮），按来源宏平均：平均宏 F1 {d.mean():+.3f} [{np.percentile(bs[:, 0], 2.5):+.3f}, {np.percentile(bs[:, 0], 97.5):+.3f}]"
-                     f"（来源重抽样）；辅助更好的来源 {int((d > 0).sum())} / {len(keep)}；等级准确率 {db.mean():+.3f} [{np.percentile(bs[:, 1], 2.5):+.3f}, {np.percentile(bs[:, 1], 97.5):+.3f}]。")
-        dt = np.array([per["DeBERTa + 辅助"][s]["mean_macro_f1"] - per["TF-IDF + LR"][s]["mean_macro_f1"] for s in keep])
-        lines.append(f"辅助 − TF-IDF，按来源宏平均：平均宏 F1 {dt.mean():+.3f}；辅助更好的来源 {int((dt > 0).sum())} / {len(keep)}。")
+        lines.append(f"\nAuxiliary − DeBERTa (25 epochs), source-macro average: mean macro-F1 {d.mean():+.3f} [{np.percentile(bs[:, 0], 2.5):+.3f}, {np.percentile(bs[:, 0], 97.5):+.3f}]"
+                     f" (sources resampled); sources where the auxiliary model is better {int((d > 0).sum())} / {len(keep)}; band accuracy {db.mean():+.3f} [{np.percentile(bs[:, 1], 2.5):+.3f}, {np.percentile(bs[:, 1], 97.5):+.3f}]. ")
+        dt = np.array([per["DeBERTa + auxiliary"][s]["mean_macro_f1"] - per["TF-IDF + LR"][s]["mean_macro_f1"] for s in keep])
+        lines.append(f"Auxiliary − TF-IDF, source-macro average: mean macro-F1 {dt.mean():+.3f}; sources where the auxiliary model is better {int((dt > 0).sum())} / {len(keep)}.")
 
 
 def part_e(test, lines):
@@ -131,38 +133,38 @@ def part_e(test, lines):
     def enc(path):
         return Encoded(pd.read_parquet(path).set_index("cve_id").loc[ids].reset_index())
     es = {"TF-IDF + LR": [enc(ROOT / "results" / "baselines_v0" / "predictions" / "T2_temporal_tfidf_lr.parquet")],
-          "DeBERTa（25 轮）": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
-          "DeBERTa + 辅助": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
+          "DeBERTa (25 epochs)": [enc(ENC / f"T2_temporal_deberta-v3-base_none_e25_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)],
+          "DeBERTa + auxiliary": [enc(ENC / f"T2_temporal_deberta-v3-base_none_aux_e5_cwinv_sqrt_s{s}" / "pred_latent.parquet") for s in range(5)]}
     old = (test["cve_id"].str.extract(r"CVE-(\d{4})-")[0].astype(int) < 2025).to_numpy()
     nd = (test["label_type"] != "derived").to_numpy()
-    lines += ["\n## E. 去掉回填的测试 CVE（编号年份早于 2025）后的主要结果\n",
-              f"去掉 {int(old.sum()):,} 条（其中 VulnCheck {int((old & (test['source'] == 'VulnCheck').to_numpy()).sum()):,} 条）。平均宏 F1 / 等级准确率：\n",
-              "| 范围 | n | TF-IDF + LR | DeBERTa（25 轮） | DeBERTa + 辅助 | 辅助 − DeBERTa（宏 F1）[95%] |", "|---|---|---|---|---|---|"]
-    for name, m in [("全部测试集", np.ones(len(test), bool)), ("全部，去掉回填", ~old), ("非 derived", nd), ("非 derived，去掉回填", nd & ~old),
-                    ("VulnCheck", (test["source"] == "VulnCheck").to_numpy()), ("VulnCheck，去掉回填", (test["source"] == "VulnCheck").to_numpy() & ~old),
-                    ("VulnCheck，只看回填", (test["source"] == "VulnCheck").to_numpy() & old)]:
+    lines += ["\n## E. Main results without the back-filled test CVEs (identifier year before 2025)\n",
+              f"Removed: {int(old.sum()):,} (VulnCheck {int((old & (test['source'] == 'VulnCheck').to_numpy()).sum()):,}). Mean macro-F1 / band accuracy:\n",
+              "| Scope | n | TF-IDF + LR | DeBERTa (25 epochs) | DeBERTa + auxiliary | Auxiliary − DeBERTa (macro-F1) [95%] |", "|---|---|---|---|---|---|"]
+    for name, m in [("all test labels", np.ones(len(test), bool)), ("all, without back-filled", ~old), ("non-derived", nd), ("non-derived, without back-filled", nd & ~old),
+                    ("VulnCheck", (test["source"] == "VulnCheck").to_numpy()), ("VulnCheck, without back-filled", (test["source"] == "VulnCheck").to_numpy() & ~old),
+                    ("VulnCheck, back-filled only", (test["source"] == "VulnCheck").to_numpy() & old)]:
         idx = np.flatnonzero(m)
 
         def f(ix, k, key="mean_macro_f1"):
             return np.mean([fast_scores(t, e, ix)[key] for e in es[k]])
         cells = [f"{f(idx, k):.3f} / {f(idx, k, 'band_acc'):.3f}" for k in es]
-        bs = [f(ix, "DeBERTa + 辅助") - f(ix, "DeBERTa（25 轮）") for ix in (rng.choice(idx, size=len(idx), replace=True) for _ in range(1000))]
-        d = f(idx, "DeBERTa + 辅助") - f(idx, "DeBERTa（25 轮）")
+        bs = [f(ix, "DeBERTa + auxiliary") - f(ix, "DeBERTa (25 epochs)") for ix in (rng.choice(idx, size=len(idx), replace=True) for _ in range(1000))]
+        d = f(idx, "DeBERTa + auxiliary") - f(idx, "DeBERTa (25 epochs)")
         lines.append(f"| {name} | {len(idx):,} | " + " | ".join(cells) + f" | {d:+.3f} [{np.percentile(bs, 2.5):+.3f}, {np.percentile(bs, 97.5):+.3f}] |")
 
 
 def part_d(df, lines):
     te = df[(df["pub"] >= CUTOFF) & df["has_v31"]]
-    lines += ["\n## D. T1 测试集（2026 年、双版本评分）的标签类型\n", "；".join(f"{k} {v:,}" for k, v in te["label_type"].value_counts().items()) + f"；合计 {len(te):,}。",
-              "v4-only 类型的 CNA 按定义双版本评分不到 5%；它们在 2026 年的双版本评分 CVE："
-              + f"{int((te['label_type'] == 'v4_only').sum())} 条（" + "、".join(f"{s} {n}" for s, n in te.loc[te['label_type'] == 'v4_only', 'source'].value_counts().items()) + "）。"]
+    lines += ["\n## D. Label types of the T1 test set (2026, dual-scored)\n", "; ".join(f"{k} {v:,}" for k, v in te["label_type"].value_counts().items()) + f"; total {len(te):,}.",
+              "By definition, fewer than 5% of the CVEs of v4-only CNAs are dual-scored; their dual-scored CVEs in 2026: "
+              + f"{int((te['label_type'] == 'v4_only').sum())} (" + ", ".join(f"{s} {n}" for s, n in te.loc[te['label_type'] == 'v4_only', 'source'].value_counts().items()) + ")."]
 
 
 def main():
     df = load()
     df["label_type"] = df["source"].map(source_type_map()).fillna("other")
     test = df[df["pub"] >= CUTOFF].reset_index(drop=True)
-    lines = ["# 来源可预测性、回填与按来源宏平均的 CPU 分析（自动生成）\n"]
+    lines = ["# Predictability by source, back-filling and source-macro averages (generated automatically)\n"]
     for step in (lambda: part_a(df, lines), lambda: part_b(test, lines), lambda: part_c(test, lines), lambda: part_d(df, lines), lambda: part_e(test, lines)):
         step()
         OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")

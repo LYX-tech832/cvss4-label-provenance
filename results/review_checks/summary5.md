@@ -1,64 +1,64 @@
-# 标签替换对照（时间划分测试集，非 derived 来源的双版本评分 CVE；自动生成）
+# Label-substitution control (temporal split test set, dual-scored CVEs of non-derived sources; generated automatically)
 
-共 7,926 条（VulnCheck 6,068，其他 1,858）；其中原始 v4.0 向量本来就等于规则 R 换算结果的 67.2%。
-同一批预测分别对照：① CNA 原始 v4.0 标签；② 规则 R 换算同一 CNA 的 v3.1 得到的标签。差值 = ② − ①（配对 bootstrap 1,000 次，95% 区间）。
+7,926 CVEs in total (VulnCheck 6,068, others 1,858); for 67.2% of them the original v4.0 vector already equals the rule-R conversion.
+The same predictions are scored against (a) the CNA's original v4.0 labels and (b) the labels obtained by converting the same CNA's v3.1 vectors with rule R. Difference = (b) − (a) (paired bootstrap with 1,000 resamples, 95% interval).
 
 
-## 全部（n = 7,926）
+## all (n = 7,926)
 
-| 模型 | 指标 | 对照原始标签 | 对照规则 R 标签 | 差值 [95%] |
+| Model | Metric | Against original labels | Against rule-R labels | Difference [95%] |
 |---|---|---|---|---|
 | TF-IDF + LR | mean_macro_f1 | 0.573 | 0.553 | -0.020 [-0.024, -0.015] |
 | TF-IDF + LR | band_acc | 0.563 | 0.570 | +0.007 [+0.002, +0.013] |
 | TF-IDF + LR | under_rate | 0.105 | 0.121 | +0.016 [+0.013, +0.020] |
-| DeBERTa（5 种子） | mean_macro_f1 | 0.549 | 0.511 | -0.039 [-0.041, -0.036] |
-| DeBERTa（5 种子） | band_acc | 0.516 | 0.526 | +0.011 [+0.007, +0.015] |
-| DeBERTa（5 种子） | under_rate | 0.151 | 0.166 | +0.015 [+0.012, +0.018] |
-| DeBERTa + v3.1 辅助（5 种子） | mean_macro_f1 | 0.600 | 0.561 | -0.039 [-0.042, -0.036] |
-| DeBERTa + v3.1 辅助（5 种子） | band_acc | 0.589 | 0.600 | +0.011 [+0.007, +0.016] |
-| DeBERTa + v3.1 辅助（5 种子） | under_rate | 0.133 | 0.150 | +0.017 [+0.014, +0.021] |
+| DeBERTa (5 seeds) | mean_macro_f1 | 0.549 | 0.511 | -0.039 [-0.041, -0.036] |
+| DeBERTa (5 seeds) | band_acc | 0.516 | 0.526 | +0.011 [+0.007, +0.015] |
+| DeBERTa (5 seeds) | under_rate | 0.151 | 0.166 | +0.015 [+0.012, +0.018] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | mean_macro_f1 | 0.600 | 0.561 | -0.039 [-0.042, -0.036] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | band_acc | 0.589 | 0.600 | +0.011 [+0.007, +0.016] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | under_rate | 0.133 | 0.150 | +0.017 [+0.014, +0.021] |
 
-TF-IDF 逐指标准确率：原始标签 → 规则 R 标签
+TF-IDF per-metric accuracy: original labels → rule-R labels
 
 | AV | AC | AT | PR | UI | VC | VI | VA | SC | SI | SA |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0.888 → 0.895 | 0.927 → 0.895 | 0.875 → 0.984 | 0.785 → 0.783 | 0.840 → 0.830 | 0.704 → 0.715 | 0.687 → 0.706 | 0.764 → 0.767 | 0.880 → 0.885 | 0.901 → 0.909 | 0.937 → 0.944 |
 
-## VulnCheck（n = 6,068）
+## VulnCheck (n = 6,068)
 
-| 模型 | 指标 | 对照原始标签 | 对照规则 R 标签 | 差值 [95%] |
+| Model | Metric | Against original labels | Against rule-R labels | Difference [95%] |
 |---|---|---|---|---|
 | TF-IDF + LR | mean_macro_f1 | 0.536 | 0.539 | +0.003 [-0.002, +0.010] |
 | TF-IDF + LR | band_acc | 0.563 | 0.573 | +0.010 [+0.004, +0.015] |
 | TF-IDF + LR | under_rate | 0.098 | 0.112 | +0.014 [+0.010, +0.018] |
-| DeBERTa（5 种子） | mean_macro_f1 | 0.523 | 0.496 | -0.026 [-0.029, -0.024] |
-| DeBERTa（5 种子） | band_acc | 0.513 | 0.530 | +0.016 [+0.012, +0.021] |
-| DeBERTa（5 种子） | under_rate | 0.137 | 0.149 | +0.012 [+0.009, +0.015] |
-| DeBERTa + v3.1 辅助（5 种子） | mean_macro_f1 | 0.575 | 0.549 | -0.026 [-0.030, -0.021] |
-| DeBERTa + v3.1 辅助（5 种子） | band_acc | 0.587 | 0.602 | +0.015 [+0.010, +0.020] |
-| DeBERTa + v3.1 辅助（5 种子） | under_rate | 0.127 | 0.141 | +0.015 [+0.011, +0.018] |
+| DeBERTa (5 seeds) | mean_macro_f1 | 0.523 | 0.496 | -0.026 [-0.029, -0.024] |
+| DeBERTa (5 seeds) | band_acc | 0.513 | 0.530 | +0.016 [+0.012, +0.021] |
+| DeBERTa (5 seeds) | under_rate | 0.137 | 0.149 | +0.012 [+0.009, +0.015] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | mean_macro_f1 | 0.575 | 0.549 | -0.026 [-0.030, -0.021] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | band_acc | 0.587 | 0.602 | +0.015 [+0.010, +0.020] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | under_rate | 0.127 | 0.141 | +0.015 [+0.011, +0.018] |
 
-TF-IDF 逐指标准确率：原始标签 → 规则 R 标签
+TF-IDF per-metric accuracy: original labels → rule-R labels
 
 | AV | AC | AT | PR | UI | VC | VI | VA | SC | SI | SA |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0.898 → 0.907 | 0.929 → 0.913 | 0.887 → 0.997 | 0.781 → 0.779 | 0.828 → 0.817 | 0.701 → 0.720 | 0.677 → 0.705 | 0.779 → 0.784 | 0.886 → 0.888 | 0.914 → 0.917 | 0.955 → 0.963 |
 
-## 不含 VulnCheck（n = 1,858）
+## without VulnCheck (n = 1,858)
 
-| 模型 | 指标 | 对照原始标签 | 对照规则 R 标签 | 差值 [95%] |
+| Model | Metric | Against original labels | Against rule-R labels | Difference [95%] |
 |---|---|---|---|---|
 | TF-IDF + LR | mean_macro_f1 | 0.591 | 0.538 | -0.053 [-0.060, -0.044] |
 | TF-IDF + LR | band_acc | 0.560 | 0.560 | +0.000 [-0.012, +0.012] |
 | TF-IDF + LR | under_rate | 0.128 | 0.150 | +0.023 [+0.015, +0.031] |
-| DeBERTa（5 种子） | mean_macro_f1 | 0.560 | 0.507 | -0.053 [-0.058, -0.048] |
-| DeBERTa（5 种子） | band_acc | 0.522 | 0.516 | -0.007 [-0.015, +0.001] |
-| DeBERTa（5 种子） | under_rate | 0.195 | 0.219 | +0.024 [+0.017, +0.031] |
-| DeBERTa + v3.1 辅助（5 种子） | mean_macro_f1 | 0.615 | 0.561 | -0.054 [-0.060, -0.048] |
-| DeBERTa + v3.1 辅助（5 种子） | band_acc | 0.592 | 0.591 | -0.001 [-0.010, +0.007] |
-| DeBERTa + v3.1 辅助（5 种子） | under_rate | 0.153 | 0.177 | +0.024 [+0.017, +0.032] |
+| DeBERTa (5 seeds) | mean_macro_f1 | 0.560 | 0.507 | -0.053 [-0.058, -0.048] |
+| DeBERTa (5 seeds) | band_acc | 0.522 | 0.516 | -0.007 [-0.015, +0.001] |
+| DeBERTa (5 seeds) | under_rate | 0.195 | 0.219 | +0.024 [+0.017, +0.031] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | mean_macro_f1 | 0.615 | 0.561 | -0.054 [-0.060, -0.048] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | band_acc | 0.592 | 0.591 | -0.001 [-0.010, +0.007] |
+| DeBERTa + v3.1 auxiliary task (5 seeds) | under_rate | 0.153 | 0.177 | +0.024 [+0.017, +0.032] |
 
-TF-IDF 逐指标准确率：原始标签 → 规则 R 标签
+TF-IDF per-metric accuracy: original labels → rule-R labels
 
 | AV | AC | AT | PR | UI | VC | VI | VA | SC | SI | SA |
 |---|---|---|---|---|---|---|---|---|---|---|

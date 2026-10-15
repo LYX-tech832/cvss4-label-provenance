@@ -1,13 +1,13 @@
-# NVD 自己给出 v4.0 向量的 CVE（自动生成）
+# CVEs with a v4.0 vector assigned by the NVD itself (generated automatically)
 
-NVD 记录 37,909 条；v4.0 数据集中有 NVD 自评 v3.1 向量的 CVE 16,250 个。
+NVD records: 37,909; CVEs of the v4.0 dataset with an NVD-assigned v3.1 vector: 16,250.
 
-| CVE | 发布日期 | 在 v4.0 数据集中的 CNA | 属于有 NVD v3.1 的那批 |
+| CVE | Published | CNA in the v4.0 dataset | In that set |
 |---|---|---|---|
-| CVE-2024-7450 | 2024-08-04 | VulDB | 是 |
-| CVE-2024-7451 | 2024-08-04 | VulDB | 是 |
-| CVE-2024-7452 | 2024-08-04 | VulDB | 是 |
-| CVE-2024-7871 | 2024-09-02 | ZUSO ART | 是 |
-| CVE-2025-3067 | 2025-04-02 | — | 否 |
+| CVE-2024-7450 | 2024-08-04 | VulDB | yes |
+| CVE-2024-7451 | 2024-08-04 | VulDB | yes |
+| CVE-2024-7452 | 2024-08-04 | VulDB | yes |
+| CVE-2024-7871 | 2024-09-02 | ZUSO ART | yes |
+| CVE-2025-3067 | 2025-04-02 | — | no |
 
-共 5 个，其中属于有 NVD v3.1 的那批的 4 个。
+5 CVEs in total, 4 of them in that set.

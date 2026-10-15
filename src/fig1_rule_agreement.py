@@ -1,9 +1,11 @@
-"""图 1：主要 CNA 的 v4.0 向量与"规则 R 换算其自身 v3.1 向量"完全一致的比例，按季度统计（CPU）。
+"""Figure S2: share of the main CNAs' v4.0 vectors identical to the rule-R conversion of their own v3.1 vectors, by quarter (CPU).
 
-- 只统计同一 CNA 同时给出 v3.1 与 v4.0 的 CVE（双标）；季度按 CVE 发布日期划分；
-- 上图：各 CNA 每季度的一致率（样本少于 MIN_N 的季度不画）；下图：每季度双标 v4.0 标签的数量（VulDB / VulnCheck / 其他）；
-- 数字直接从原始数据重算（不用 results/label_provenance/summary.md 里四舍五入到整数的汇总）。
-输出：paper/figures/fig1_rule_agreement.pdf、.png 和作图数据 fig1_data.csv
+- Only CVEs for which the same CNA gives both v3.1 and v4.0 (dual-scored); quarters by CVE publication date;
+- top panel: agreement of each CNA per quarter (quarters with fewer than MIN_N samples are not drawn); bottom panel: number of
+  dual-scored v4.0 labels per quarter (VulDB / VulnCheck / others);
+- the numbers are recomputed from the data (not taken from the summary in results/label_provenance/summary.md, which is rounded to
+  whole percentages).
+Output: paper/figures/fig1_rule_agreement.pdf, .png and the plotted data fig1_data.csv
 """
 
 import sys

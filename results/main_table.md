@@ -1,11 +1,11 @@
-# 主结果表（T2，自动生成）
+# Main results table (T2, generated automatically)
 
-DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方法为确定性结果（单次）。
+The two DeBERTa rows give the mean ± standard deviation over 5 seeds of the configuration selected in W4; the other methods are deterministic (single run).
 
 
-## temporal（全部测试集，n = 21,900）
+## temporal (all test labels, n = 21,900)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.276 | 0.335 | 0.051 | 1.458 | 0.469 | 0.492 | 0.000 |
 | TF-IDF + LR | 0.605 | 0.522 | 0.237 | 1.334 | 0.598 | 0.136 | 0.854 |
@@ -14,9 +14,9 @@ DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方�
 | DeBERTa (5 seeds) | 0.605 ± 0.002 | 0.550 ± 0.003 | 0.188 ± 0.011 | 1.444 ± 0.054 | 0.569 ± 0.006 | 0.159 ± 0.011 | 0.827 ± 0.016 |
 | DeBERTa + v3.1 auxiliary task (5 seeds) | 0.645 ± 0.002 | 0.563 ± 0.005 | 0.237 ± 0.004 | 1.174 ± 0.023 | 0.623 ± 0.003 | 0.143 ± 0.011 | 0.816 ± 0.019 |
 
-## temporal（去掉 derived，n = 16,749）
+## temporal (without derived labels, n = 16,749)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.258 | 0.327 | 0.002 | 1.488 | 0.365 | 0.593 | 0.000 |
 | TF-IDF + LR | 0.547 | 0.512 | 0.171 | 1.525 | 0.504 | 0.155 | 0.870 |
@@ -25,9 +25,9 @@ DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方�
 | DeBERTa (5 seeds) | 0.534 ± 0.004 | 0.528 ± 0.006 | 0.112 ± 0.013 | 1.660 ± 0.070 | 0.468 ± 0.008 | 0.184 ± 0.015 | 0.839 ± 0.017 |
 | DeBERTa + v3.1 auxiliary task (5 seeds) | 0.590 ± 0.005 | 0.547 ± 0.006 | 0.165 ± 0.004 | 1.321 ± 0.028 | 0.537 ± 0.003 | 0.165 ± 0.014 | 0.826 ± 0.021 |
 
-## loso:VulnCheck（全部测试集，n = 7,429）
+## loso:VulnCheck (all test labels, n = 7,429)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.277 | 0.335 | 0.006 | 1.507 | 0.337 | 0.643 | 0.000 |
 | TF-IDF + LR | 0.562 | 0.548 | 0.225 | 1.133 | 0.572 | 0.104 | 0.920 |
@@ -36,9 +36,9 @@ DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方�
 | DeBERTa (5 seeds) | 0.581 ± 0.003 | 0.564 ± 0.003 | 0.181 ± 0.012 | 1.070 ± 0.016 | 0.579 ± 0.010 | 0.131 ± 0.007 | 0.884 ± 0.009 |
 | DeBERTa + v3.1 auxiliary task (5 seeds) | 0.607 ± 0.004 | 0.579 ± 0.005 | 0.215 ± 0.012 | 0.986 ± 0.013 | 0.601 ± 0.008 | 0.125 ± 0.008 | 0.878 ± 0.012 |
 
-## loso:VulnCheck（去掉 derived，n = 7,429）
+## loso:VulnCheck (without derived labels, n = 7,429)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.277 | 0.335 | 0.006 | 1.507 | 0.337 | 0.643 | 0.000 |
 | TF-IDF + LR | 0.562 | 0.548 | 0.225 | 1.133 | 0.572 | 0.104 | 0.920 |
@@ -47,9 +47,9 @@ DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方�
 | DeBERTa (5 seeds) | 0.581 ± 0.003 | 0.564 ± 0.003 | 0.181 ± 0.012 | 1.070 ± 0.016 | 0.579 ± 0.010 | 0.131 ± 0.007 | 0.884 ± 0.009 |
 | DeBERTa + v3.1 auxiliary task (5 seeds) | 0.607 ± 0.004 | 0.579 ± 0.005 | 0.215 ± 0.012 | 0.986 ± 0.013 | 0.601 ± 0.008 | 0.125 ± 0.008 | 0.878 ± 0.012 |
 
-## loso:GitHub_M（全部测试集，n = 5,129）
+## loso:GitHub_M (all test labels, n = 5,129)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.283 | 0.322 | 0.004 | 1.734 | 0.412 | 0.150 | 1.000 |
 | TF-IDF + LR | 0.481 | 0.444 | 0.110 | 1.659 | 0.484 | 0.226 | 0.775 |
@@ -58,9 +58,9 @@ DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方�
 | DeBERTa (5 seeds) | 0.525 ± 0.007 | 0.497 ± 0.010 | 0.085 ± 0.007 | 1.576 ± 0.054 | 0.462 ± 0.013 | 0.198 ± 0.025 | 0.802 ± 0.034 |
 | DeBERTa + v3.1 auxiliary task (5 seeds) | 0.542 ± 0.004 | 0.512 ± 0.006 | 0.108 ± 0.003 | 1.451 ± 0.032 | 0.493 ± 0.006 | 0.191 ± 0.011 | 0.798 ± 0.029 |
 
-## loso:GitHub_M（去掉 derived，n = 5,129）
+## loso:GitHub_M (without derived labels, n = 5,129)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.283 | 0.322 | 0.004 | 1.734 | 0.412 | 0.150 | 1.000 |
 | TF-IDF + LR | 0.481 | 0.444 | 0.110 | 1.659 | 0.484 | 0.226 | 0.775 |
@@ -69,9 +69,9 @@ DeBERTa 两行为 W4 选定配置 5 个种子的均值 ± 标准差；其余方�
 | DeBERTa (5 seeds) | 0.525 ± 0.007 | 0.497 ± 0.010 | 0.085 ± 0.007 | 1.576 ± 0.054 | 0.462 ± 0.013 | 0.198 ± 0.025 | 0.802 ± 0.034 |
 | DeBERTa + v3.1 auxiliary task (5 seeds) | 0.542 ± 0.004 | 0.512 ± 0.006 | 0.108 ± 0.003 | 1.451 ± 0.032 | 0.493 ± 0.006 | 0.191 ± 0.011 | 0.798 ± 0.029 |
 
-## loso:VulDB（全部测试集，n = 12,882）
+## loso:VulDB (all test labels, n = 12,882)
 
-| 方法 | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
+| Method | macro-F1 | v4-F1 | exact | MAE | band | under | H+C rec. |
 |---|---|---|---|---|---|---|---|
 | Majority | 0.272 | 0.361 | 0.000 | 3.211 | 0.024 | 0.000 | 1.000 |
 | TF-IDF + LR | 0.366 | 0.391 | 0.018 | 2.828 | 0.152 | 0.065 | 0.976 |
